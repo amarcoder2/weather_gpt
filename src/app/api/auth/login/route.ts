@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { userRepository } from '../../../../lib/db/postgres';
-import { signToken } from '../../../../lib/auth/jwt';
+import { signToken, verifyVault } from '../../../../lib/auth/jwt';
+import { DbUser } from '../../../../types/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +17,16 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await userRepository.findByEmail(normalizedEmail);
+    let user = await userRepository.findByEmail(normalizedEmail);
+
+    // Fallback: recover user from signed vault cookie across serverless cold starts
+    if (!user) {
+      const vaultCookie = req.cookies.get('weathergpt_user_vault')?.value;
+      const vaultUser = vaultCookie ? verifyVault<DbUser>(vaultCookie) : null;
+      if (vaultUser && vaultUser.email.toLowerCase() === normalizedEmail) {
+        user = vaultUser;
+      }
+    }
 
     // Generic error to avoid user enumeration
     if (!user) {

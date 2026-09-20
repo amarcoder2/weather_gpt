@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '../../../../lib/auth/jwt';
+import { authenticateRequest, verifyVault } from '../../../../lib/auth/jwt';
 import { userRepository } from '../../../../lib/db/postgres';
+import { DbUser } from '../../../../types/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,27 +13,28 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const user = await userRepository.findById(payload.userId);
+    let user = await userRepository.findById(payload.userId);
     if (!user) {
-      return NextResponse.json(
-        { error: 'User record not found.' },
-        { status: 401 }
-      );
+      const vaultCookie = req.cookies.get('weathergpt_user_vault')?.value;
+      const vaultUser = vaultCookie ? verifyVault<DbUser>(vaultCookie) : null;
+      if (vaultUser && (vaultUser.id === payload.userId || vaultUser.email === payload.email)) {
+        user = vaultUser;
+      }
     }
 
     const safeUser = {
-      id: user.id,
-      uid: user.id,
-      name: user.name,
-      displayName: user.name,
-      email: user.email,
-      role: (user.role as any) || 'user',
-      latitude: user.latitude || null,
-      longitude: user.longitude || null,
-      location_name: user.location_name || null,
-      location_updated_at: user.location_updated_at || null,
-      created_at: user.created_at,
-      last_login: user.last_login,
+      id: user ? user.id : payload.userId,
+      uid: user ? user.id : payload.userId,
+      name: user ? user.name : payload.name,
+      displayName: user ? user.name : payload.name,
+      email: user ? user.email : payload.email,
+      role: (user?.role as any) || (payload.role as any) || 'user',
+      latitude: user?.latitude || null,
+      longitude: user?.longitude || null,
+      location_name: user?.location_name || null,
+      location_updated_at: user?.location_updated_at || null,
+      created_at: user?.created_at || new Date().toISOString(),
+      last_login: user?.last_login || new Date().toISOString(),
     };
 
     return NextResponse.json({

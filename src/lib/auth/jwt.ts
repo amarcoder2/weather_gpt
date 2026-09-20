@@ -51,3 +51,21 @@ export function authenticateRequest(req: NextRequest): TokenPayload | null {
   if (!token) return null;
   return verifyToken(token);
 }
+
+export function signVault(data: unknown): string {
+  return jwt.sign({ vault: data }, JWT_SECRET, {
+    algorithm: JWT_ALGORITHM,
+    expiresIn: '30d',
+  });
+}
+
+export function verifyVault<T>(token: string): T | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: [JWT_ALGORITHM],
+    }) as { vault: T };
+    return decoded?.vault || null;
+  } catch {
+    return null;
+  }
+}
