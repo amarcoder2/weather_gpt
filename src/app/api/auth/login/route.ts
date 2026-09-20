@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { userRepository } from '../../../../lib/db/postgres';
-import { signToken, verifyVault } from '../../../../lib/auth/jwt';
+import { signToken, verifyVault, signVault } from '../../../../lib/auth/jwt';
 import { DbUser } from '../../../../types/auth';
 
 export async function POST(req: NextRequest) {
@@ -28,16 +28,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Generic error to avoid user enumeration
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid email or password.' },
-        { status: 401 }
-      );
+    // Server-side admin authentication via Vercel environment variable ADMIN_PASSWORD
+    const adminEmail = (process.env.ADMIN_EMAIL || process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in').toLowerCase().trim();
+    const envAdminPassword = process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD;
+
+    let isMatch = false;
+    let isAdminAuth = false;
+
+    // Direct administrative check using server-side ADMIN_PASSWORD
+    if (envAdminPassword && (normalizedEmail === adminEmail || (user && user.role === 'admin'))) {
+      if (password === envAdminPassword) {
+        isMatch = true;
+        isAdminAuth = true;
+        if (!user) {
+          user = {
+            id: 'usr_admin_root',
+            name: process.env.ADMIN_NAME || 'IMD Chief Administrator',
+            email: normalizedEmail,
+            password_hash: '',
+            role: 'admin',
+            created_at: new Date().toISOString(),
+            last_login: new Date().toISOString(),
+          };
+        } else {
+          user.role = 'admin';
+        }
+      }
     }
 
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
+    // If not authenticated via ADMIN_PASSWORD, check bcrypt hash for standard registered users
+    if (!isMatch && user && user.password_hash) {
+      isMatch = await bcrypt.compare(password, user.password_hash);
+    }
+
+    // Generic error to avoid user enumeration if both checks fail
+    if (!isMatch || !user) {
       return NextResponse.json(
         { error: 'Invalid email or password.' },
         { status: 401 }
@@ -82,6 +107,24 @@ export async function POST(req: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
+
+    // If authenticated as admin or user has admin role, refresh vault cookie with admin role
+    if (isAdminAuth || user.role === 'admin') {
+      const vaultToken = signVault({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: 'admin',
+        password_hash: user.password_hash || '',
+      });
+      response.cookies.set('weathergpt_user_vault', vaultToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+    }
 
     return response;
   } catch (err: unknown) {

@@ -69,18 +69,18 @@ async function seedDatabase() {
     console.warn('Example: DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"\n');
     
     // Check if passwords were provided anyway
-    if (process.env.DEMO_ADMIN_PASSWORD || process.env.DEMO_USER_PASSWORD) {
+    if (process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD || process.env.DEMO_USER_PASSWORD) {
       console.log('[Info] Environment passwords detected:');
-      if (process.env.DEMO_ADMIN_PASSWORD) {
-        console.log('  - DEMO_ADMIN_PASSWORD is set for:', process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in');
+      if (process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD) {
+        console.log('  - ADMIN_PASSWORD / DEMO_ADMIN_PASSWORD is set for:', process.env.ADMIN_EMAIL || process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in');
       }
       if (process.env.DEMO_USER_PASSWORD) {
         console.log('  - DEMO_USER_PASSWORD is set for:', process.env.DEMO_USER_EMAIL || 'user@weathergpt.gov.in');
       }
       console.log('When running in development without PostgreSQL, in-memory auth will automatically hash and use these environment values.');
     } else {
-      console.warn('[Notice] Neither DEMO_ADMIN_PASSWORD nor DEMO_USER_PASSWORD is set in the environment.');
-      console.warn('Pass DEMO_ADMIN_PASSWORD="<password>" to seed demo accounts securely.');
+      console.warn('[Notice] Neither ADMIN_PASSWORD nor DEMO_USER_PASSWORD is set in the environment.');
+      console.warn('Set ADMIN_PASSWORD="<password>" to seed or authenticate admin accounts securely.');
     }
     return;
   }
@@ -119,13 +119,13 @@ async function seedDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE;
     `);
 
-    // 2. Seed Admin Account if DEMO_ADMIN_PASSWORD is set
-    const adminPassword = process.env.DEMO_ADMIN_PASSWORD;
-    const adminEmail = (process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in').toLowerCase().trim();
+    // 2. Seed Admin Account if ADMIN_PASSWORD or DEMO_ADMIN_PASSWORD is set
+    const adminPassword = process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD;
+    const adminEmail = (process.env.ADMIN_EMAIL || process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in').toLowerCase().trim();
 
     if (adminPassword) {
       if (adminPassword.length < 8) {
-        console.warn('[Warning] DEMO_ADMIN_PASSWORD is shorter than 8 characters. Minimum 8 characters recommended.');
+        console.warn('[Warning] Admin password is shorter than 8 characters. Minimum 8 characters recommended.');
       }
       const adminHash = await bcrypt.hash(adminPassword, 10);
       await client.query(
@@ -137,7 +137,7 @@ async function seedDatabase() {
       );
       console.log(`[Success] Seeded admin account: ${adminEmail} (Role: admin)`);
     } else {
-      console.log(`[Skipped] DEMO_ADMIN_PASSWORD not set. Admin account was not modified.`);
+      console.log(`[Skipped] Neither ADMIN_PASSWORD nor DEMO_ADMIN_PASSWORD set. Admin account was not modified.`);
     }
 
     // 3. Seed Demo User Account if DEMO_USER_PASSWORD is set
