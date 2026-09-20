@@ -23,7 +23,7 @@ export interface ApiResponseEnvelope<T> {
 class ApiClient {
   private activeRole: DemoRole = 'SUPER_ADMIN';
   private authToken: string | null = null;
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/weather-gpt-sih/asia-south1/api/v1';
+  private baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
   getActiveRole(): DemoRole {
     return this.activeRole;
@@ -38,9 +38,19 @@ class ApiClient {
 
   setAuthToken(token: string | null): void {
     this.authToken = token;
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('weathergpt_access_token', token);
+      } else {
+        localStorage.removeItem('weathergpt_access_token');
+      }
+    }
   }
 
   getAuthToken(): string | null {
+    if (!this.authToken && typeof window !== 'undefined') {
+      this.authToken = localStorage.getItem('weathergpt_access_token');
+    }
     return this.authToken;
   }
 
@@ -50,7 +60,26 @@ class ApiClient {
       if (saved) {
         this.activeRole = saved;
       }
+      const savedToken = localStorage.getItem('weathergpt_access_token');
+      if (savedToken) {
+        this.authToken = savedToken;
+      }
     }
+  }
+
+  private resolveUrl(path: string): string {
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    if (
+      cleanPath.startsWith('/auth') ||
+      cleanPath.startsWith('/location') ||
+      cleanPath.startsWith('/weather/coordinates')
+    ) {
+      return `/api${cleanPath}`;
+    }
+    if (this.baseUrl && !this.baseUrl.includes('localhost:5001')) {
+      return `${this.baseUrl}${cleanPath}`;
+    }
+    return `/api${cleanPath}`;
   }
 
   private getHeaders(): HeadersInit {
@@ -61,8 +90,9 @@ class ApiClient {
       'X-WeatherGPT-Email': `${this.activeRole.toLowerCase()}@weathergpt.gov.in`,
     };
 
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
+    const token = this.getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     return headers;
@@ -70,11 +100,19 @@ class ApiClient {
 
   async get<T>(path: string): Promise<ApiResponseEnvelope<T>> {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(this.resolveUrl(path), {
         method: 'GET',
         headers: this.getHeaders(),
       });
-      return await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error || { code: 'REQUEST_FAILED', message: data.message || `HTTP ${res.status}` },
+          data,
+        };
+      }
+      return { success: true, data };
     } catch {
       return {
         success: false,
@@ -85,12 +123,20 @@ class ApiClient {
 
   async post<T>(path: string, body: unknown): Promise<ApiResponseEnvelope<T>> {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(this.resolveUrl(path), {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(body),
       });
-      return await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error || { code: 'REQUEST_FAILED', message: data.message || `HTTP ${res.status}` },
+          data,
+        };
+      }
+      return { success: true, data };
     } catch {
       return {
         success: false,
@@ -101,12 +147,20 @@ class ApiClient {
 
   async patch<T>(path: string, body: unknown): Promise<ApiResponseEnvelope<T>> {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(this.resolveUrl(path), {
         method: 'PATCH',
         headers: this.getHeaders(),
         body: JSON.stringify(body),
       });
-      return await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error || { code: 'REQUEST_FAILED', message: data.message || `HTTP ${res.status}` },
+          data,
+        };
+      }
+      return { success: true, data };
     } catch {
       return {
         success: false,
@@ -117,11 +171,19 @@ class ApiClient {
 
   async delete<T>(path: string): Promise<ApiResponseEnvelope<T>> {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
+      const res = await fetch(this.resolveUrl(path), {
         method: 'DELETE',
         headers: this.getHeaders(),
       });
-      return await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error || { code: 'REQUEST_FAILED', message: data.message || `HTTP ${res.status}` },
+          data,
+        };
+      }
+      return { success: true, data };
     } catch {
       return {
         success: false,
@@ -132,3 +194,4 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+

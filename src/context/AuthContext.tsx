@@ -1,192 +1,176 @@
 'use client';
 
-// ==============================================================================
-// AUTHENTICATION & RBAC CONTEXT (Section 6, 7, 8)
-// Provides reactive Firebase Auth state, server custom claims, and Firestore profile
-// ==============================================================================
-
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { User, onIdTokenChanged, updateProfile } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '../lib/firebase/firebase';
-import {
-  loginWithEmail,
-  registerWithEmail,
-  loginWithGoogle,
-  logoutUser,
-  subscribeToAuthChanges,
-} from '../lib/firebase/auth';
-import { fetchUserProfile } from '../lib/firebase/firestore';
-import { UserProfile, UserRole } from '../types/user';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { AuthUser, UserRole } from '../types/auth';
 import { apiClient } from '../services/apiClient';
 
 interface AuthContextType {
-  currentUser: User | null;
-  userProfile: UserProfile | null;
+  user: AuthUser | null;
+  currentUser: AuthUser | null; // Compatibility alias
+  isAuthenticated: boolean;
   role: UserRole;
   token: string | null;
   loading: boolean;
-  isConfigured: boolean;
   error: string | null;
+  login: (email: string, pass: string) => Promise<void>;
+  register: (name: string, email: string, pass: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  updateUserLocation: (latitude: number, longitude: number, locationName: string) => Promise<void>;
+  // Legacy Firebase sign-in compatibility aliases so existing components don't break
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, displayName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  isConfigured: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [role, setRole] = useState<UserRole>('USER');
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [role, setRole] = useState<UserRole>('user');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const configured = useMemo(() => isFirebaseConfigured(), []);
-
-  // Sync profile & resolve custom claims
-  const syncUserState = async (user: User | null) => {
-    if (!user) {
-      setCurrentUser(null);
-      setUserProfile(null);
-      setRole('USER');
-      setToken(null);
-      apiClient.setAuthToken(null);
-      setLoading(false);
-      return;
-    }
-
+  const fetchProfile = useCallback(async () => {
     try {
-      setCurrentUser(user);
-      const idToken = await user.getIdToken();
-      setToken(idToken);
-      apiClient.setAuthToken(idToken);
-
-      // Extract custom claims if set by server
-      const tokenResult = await user.getIdTokenResult();
-      const claimRole = (tokenResult.claims.role as UserRole) || null;
-
-      // Fetch Firestore profile
-      let profile = (await fetchUserProfile(user.uid)) as UserProfile | null;
-
-      if (!profile) {
-        // Construct fallback initial profile
-        profile = {
-          uid: user.uid,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Meteorologist',
-          email: user.email || '',
-          photoURL: user.photoURL || undefined,
-          role: claimRole || 'USER',
-          preferredLanguage: 'en',
-          status: 'ACTIVE',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
+      const storedToken = apiClient.getAuthToken();
+      if (!storedToken) {
+        setUser(null);
+        setRole('user');
+        setToken(null);
+        setLoading(false);
+        return;
       }
 
-      setUserProfile(profile);
-      setRole(claimRole || profile.role || 'USER');
-    } catch (err: unknown) {
-      console.error('Error synchronizing auth state:', err);
+      const res = await apiClient.get<{ user: AuthUser }>('/auth/me');
+      if (res.success && res.data?.user) {
+        setUser(res.data.user);
+        setRole(res.data.user.role || 'user');
+        setToken(storedToken);
+      } else {
+        // Token invalid or expired
+        apiClient.setAuthToken(null);
+        setUser(null);
+        setRole('user');
+        setToken(null);
+      }
+    } catch {
+      apiClient.setAuthToken(null);
+      setUser(null);
+      setRole('user');
+      setToken(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    // Listen to auth state changes
-    const unsubscribeAuth = subscribeToAuthChanges((user) => {
-      syncUserState(user);
-    });
-
-    // Listen to token changes for custom claim refreshes
-    const unsubscribeToken = onIdTokenChanged(auth, (user) => {
-      if (user) {
-        syncUserState(user);
-      }
-    });
-
-    return () => {
-      unsubscribeAuth();
-      unsubscribeToken();
-    };
   }, []);
 
-  const handleSignInWithEmail = async (email: string, pass: string) => {
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const login = async (email: string, pass: string) => {
     setError(null);
-    try {
-      await loginWithEmail(email, pass);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Authentication failed';
-      setError(msg);
-      throw err;
+    const res = await apiClient.post<{
+      access_token: string;
+      token_type: string;
+      user: AuthUser;
+      error?: string;
+    }>('/auth/login', {
+      email,
+      password: pass,
+    });
+
+    if (res.success && res.data?.access_token) {
+      const { access_token, user: loggedInUser } = res.data;
+      apiClient.setAuthToken(access_token);
+      setToken(access_token);
+      setUser(loggedInUser);
+      setRole(loggedInUser.role || 'user');
+      return;
+    }
+
+    const errMsg =
+      typeof res.error === 'string'
+        ? res.error
+        : (res.error as any)?.message || (res.data as any)?.error || 'Invalid email or password.';
+    setError(errMsg);
+    throw new Error(errMsg);
+  };
+
+  const register = async (name: string, email: string, pass: string) => {
+    setError(null);
+    const res = await apiClient.post<{ message?: string; error?: string }>('/auth/register', {
+      name,
+      email,
+      password: pass,
+      confirmPassword: pass,
+    });
+
+    if (!res.success) {
+      const errMsg =
+        typeof res.error === 'string'
+          ? res.error
+          : (res.error as any)?.message || (res.data as any)?.error || 'Registration failed.';
+      setError(errMsg);
+      throw new Error(errMsg);
     }
   };
 
-  const handleSignUpWithEmail = async (email: string, pass: string, displayName?: string) => {
+  const logout = async () => {
     setError(null);
     try {
-      const cred = await registerWithEmail(email, pass);
-      if (displayName && cred.user) {
-        await updateProfile(cred.user, { displayName });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Registration failed';
-      setError(msg);
-      throw err;
-    }
-  };
-
-  const handleSignInWithGoogle = async () => {
-    setError(null);
-    try {
-      await loginWithGoogle();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Google sign-in failed';
-      setError(msg);
-      throw err;
-    }
-  };
-
-  const handleLogout = async () => {
-    setError(null);
-    try {
-      await logoutUser();
-      setCurrentUser(null);
-      setUserProfile(null);
-      setRole('USER');
+      await apiClient.post('/auth/logout', {});
+    } catch {
+      // Ignore network error on logout
+    } finally {
+      apiClient.setAuthToken(null);
+      setUser(null);
+      setRole('user');
       setToken(null);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Logout failed';
-      setError(msg);
-      throw err;
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   };
 
-  const refreshProfile = async () => {
-    if (auth.currentUser) {
-      await syncUserState(auth.currentUser);
+  const updateUserLocation = async (latitude: number, longitude: number, locationName: string) => {
+    try {
+      const res = await apiClient.post<{ user: AuthUser }>('/location/save', {
+        latitude,
+        longitude,
+        location_name: locationName,
+      });
+      if (res.success && res.data?.user) {
+        setUser((prev) => (prev ? { ...prev, ...res.data!.user } : res.data!.user));
+      }
+    } catch {
+      // Non-fatal
     }
   };
 
   return (
     <AuthContext.Provider
       value={{
-        currentUser,
-        userProfile,
+        user,
+        currentUser: user,
+        isAuthenticated: !!user,
         role,
         token,
         loading,
-        isConfigured: configured,
         error,
-        signInWithEmail: handleSignInWithEmail,
-        signUpWithEmail: handleSignUpWithEmail,
-        signInWithGoogle: handleSignInWithGoogle,
-        logout: handleLogout,
-        refreshProfile,
+        login,
+        register,
+        logout,
+        refreshProfile: fetchProfile,
+        updateUserLocation,
+        signInWithEmail: login,
+        signUpWithEmail: (email, pass, displayName) => register(displayName || 'User', email, pass),
+        signInWithGoogle: async () => {
+          throw new Error('Google Sign-In requires OAuth provider credentials in production.');
+        },
+        isConfigured: true,
       }}
     >
       {children}

@@ -21,7 +21,7 @@ interface CurrentWeatherHeroProps {
 }
 
 export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather }) => {
-  const { formatTemp } = useWeather();
+  const { formatTemp, isUsingCurrentLocation } = useWeather();
 
   const getConditionIcon = (code: string) => {
     switch (code) {
@@ -86,25 +86,33 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
       {/* Header Bar: Location, Observatory & Freshness */}
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-slate-800/80">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-white font-sans tracking-tight">
-              {weather.locationName}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-white font-sans tracking-tight flex items-center gap-2">
+              <span>{isUsingCurrentLocation ? '📍' : '🏢'}</span>
+              <span>{weather.locationName}, {weather.state}</span>
             </h2>
-            <Badge variant="primary">{weather.district}</Badge>
-            <span className="text-xs text-slate-400 font-medium">({weather.state})</span>
+            {isUsingCurrentLocation ? (
+              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Current Location • GPS Live
+              </span>
+            ) : (
+              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30 font-semibold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                Selected Location • IMD Observatory
+              </span>
+            )}
           </div>
-          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+          <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5">
             <Radio className="w-3 h-3 text-emerald-400 shrink-0" />
-            <span>Observatory: <strong className="text-slate-200">{weather.stationName}</strong></span>
-            <span className="text-slate-600">·</span>
-            <span className="font-mono text-[11px] text-slate-500">{weather.lat.toFixed(2)}°N, {weather.lon.toFixed(2)}°E</span>
+            <span>Telemetry Source: <strong className="text-slate-200">{weather.stationName}</strong> ({weather.district})</span>
           </p>
         </div>
 
         {/* Data Freshness Tag */}
         <div className="flex items-center gap-2 bg-navy-950/80 px-3 py-1.5 rounded-full border border-slate-800 text-xs text-slate-400">
           <Clock className="w-3.5 h-3.5 text-sky-400" />
-          <span>Telemetry Freshness: <span className="text-slate-200 font-medium">{weather.updatedTime}</span></span>
+          <span>Freshness: <span className="text-slate-200 font-medium">{weather.updatedTime}</span></span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
         </div>
       </div>

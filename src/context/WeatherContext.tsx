@@ -4,14 +4,23 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { WeatherData } from '../types/weather';
 import { ForecastData } from '../types/forecast';
 import { RiskAssessment } from '../types/risk';
+import { LocationInfo } from '../types/location';
 import { weatherService } from '../services/weatherService';
 import { forecastService } from '../services/forecastService';
 import { riskService } from '../services/riskService';
+import { currentLocationService } from '../services/currentLocationService';
 import { DEFAULT_LOCATIONS } from '../config/constants';
 
 interface WeatherContextType {
   activeLocationId: string;
   setActiveLocationId: (id: string) => void;
+  activeLocation: LocationInfo;
+  currentLocation: LocationInfo | null;
+  isUsingCurrentLocation: boolean;
+  detectAndSetCurrentLocation: () => Promise<boolean>;
+  locationLoading: boolean;
+  locationPermissionError: string | null;
+  clearLocationError: () => void;
   weather: WeatherData | null;
   forecast: ForecastData | null;
   risk: RiskAssessment | null;
@@ -26,7 +35,11 @@ interface WeatherContextType {
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
 
 export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activeLocationId, setActiveLocationId] = useState<string>('kolkata');
+  const [activeLocationId, setActiveLocationIdState] = useState<string>('kolkata');
+  const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null);
+  const [locationLoading, setLocationLoading] = useState<boolean>(false);
+  const [locationPermissionError, setLocationPermissionError] = useState<string | null>(null);
+
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
@@ -34,18 +47,80 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [error, setError] = useState<string | null>(null);
   const [tempUnit, setTempUnit] = useState<'C' | 'F'>('C');
 
+  // Check cached current location on boot
+  useEffect(() => {
+    const cached = currentLocationService.getCachedLocation();
+    if (cached) {
+      setCurrentLocation(cached);
+    }
+  }, []);
+
+  const isUsingCurrentLocation = activeLocationId === 'current-location' || activeLocationId === 'current';
+
+  // Active location object resolution
+  const activeLocation: LocationInfo = isUsingCurrentLocation && currentLocation
+    ? currentLocation
+    : DEFAULT_LOCATIONS.find((l) => l.id === activeLocationId) || DEFAULT_LOCATIONS[0];
+
+  const setActiveLocationId = (id: string) => {
+    setLocationPermissionError(null);
+    setActiveLocationIdState(id);
+  };
+
+  const clearLocationError = () => {
+    setLocationPermissionError(null);
+  };
+
+  const detectAndSetCurrentLocation = async (): Promise<boolean> => {
+    setLocationLoading(true);
+    setLocationPermissionError(null);
+    try {
+      const res = await currentLocationService.getCurrentLocationWeather();
+      setCurrentLocation(res.location);
+      setWeather(res.weather);
+      setForecast(res.forecast);
+      setRisk(res.risk);
+      setActiveLocationIdState('current-location');
+      setLoading(false);
+      return true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to determine your current location.';
+      setLocationPermissionError(message);
+      return false;
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const loadData = async (locId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const [w, f, r] = await Promise.all([
-        weatherService.getCurrentWeather(locId),
-        forecastService.getForecast(locId),
-        riskService.getRiskAssessment(locId),
-      ]);
-      setWeather(w);
-      setForecast(f);
-      setRisk(r);
+      if (locId === 'current-location' || locId === 'current') {
+        const cachedRes = currentLocationService.getCachedResult();
+        if (cachedRes) {
+          setWeather(cachedRes.weather);
+          setForecast(cachedRes.forecast);
+          setRisk(cachedRes.risk);
+          setCurrentLocation(cachedRes.location);
+        } else {
+          // Fresh detection
+          const res = await currentLocationService.getCurrentLocationWeather();
+          setCurrentLocation(res.location);
+          setWeather(res.weather);
+          setForecast(res.forecast);
+          setRisk(res.risk);
+        }
+      } else {
+        const [w, f, r] = await Promise.all([
+          weatherService.getCurrentWeather(locId),
+          forecastService.getForecast(locId),
+          riskService.getRiskAssessment(locId),
+        ]);
+        setWeather(w);
+        setForecast(f);
+        setRisk(r);
+      }
     } catch (err) {
       console.error('Failed to load meteorological data:', err);
       setError('Unable to fetch live meteorological data. Please retry.');
@@ -59,7 +134,11 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [activeLocationId]);
 
   const refreshData = async () => {
-    await loadData(activeLocationId);
+    if (isUsingCurrentLocation) {
+      await detectAndSetCurrentLocation();
+    } else {
+      await loadData(activeLocationId);
+    }
   };
 
   const formatTemp = (celsius: number): string => {
@@ -75,6 +154,13 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
       value={{
         activeLocationId,
         setActiveLocationId,
+        activeLocation,
+        currentLocation,
+        isUsingCurrentLocation,
+        detectAndSetCurrentLocation,
+        locationLoading,
+        locationPermissionError,
+        clearLocationError,
         weather,
         forecast,
         risk,

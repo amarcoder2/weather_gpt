@@ -19,36 +19,51 @@ import {
   Settings,
   Info,
   ShieldAlert,
+  LogIn,
+  UserPlus,
+  LogOut,
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { apiClient } from '../../services/apiClient';
 
 export const MobileNav: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const { t } = useLanguage();
-  const { role, currentUser } = useAuth();
+  const { role, isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
-  const isAdminPermitted = (currentUser && role && role !== 'USER') || apiClient.getActiveRole() !== 'USER';
+  const isAdminPermitted = role === 'admin';
 
-  const primaryItems = [
-    { to: '/', label: 'Home', icon: Home, exact: true },
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/chat', label: 'Ask AI', icon: Bot, isHighlight: true },
-    { to: '/alerts', label: 'Alerts', icon: AlertTriangle, hasDot: true },
-  ];
+  const primaryItems = isAuthenticated
+    ? [
+        { to: '/', label: 'Home', icon: Home, exact: true },
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/chat', label: 'Ask AI', icon: Bot, isHighlight: true },
+        { to: '/alerts', label: 'Alerts', icon: AlertTriangle, hasDot: true },
+      ]
+    : [
+        { to: '/', label: 'Home', icon: Home, exact: true },
+        { to: '/login', label: 'Sign In', icon: LogIn },
+        { to: '/register', label: 'Register', icon: UserPlus, isHighlight: true },
+        { to: '/about', label: 'About', icon: Info },
+      ];
 
-  const secondaryItems = [
-    ...(isAdminPermitted ? [{ to: '/admin', label: 'Admin Console', icon: ShieldAlert }] : []),
-    { to: '/forecast', label: t('nav.forecast', 'Forecast'), icon: CloudSun },
-    { to: '/risk', label: t('nav.risk', 'Risk Intelligence'), icon: ShieldCheck },
-    { to: '/explorer', label: t('nav.explorer', 'Weather Explorer'), icon: Compass },
-    { to: '/history', label: t('nav.history', 'Disaster History'), icon: History },
-    { to: '/climate', label: t('nav.climate', 'Climate Trends'), icon: TrendingUp },
-    { to: '/locations', label: t('nav.locations', 'Locations'), icon: MapPin },
-    { to: '/settings', label: t('nav.settings', 'Settings'), icon: Settings },
-    { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
-  ];
+  const secondaryItems = isAuthenticated
+    ? [
+        ...(isAdminPermitted ? [{ to: '/admin', label: 'Admin Console', icon: ShieldAlert }] : []),
+        { to: '/forecast', label: t('nav.forecast', 'Forecast'), icon: CloudSun },
+        { to: '/risk', label: t('nav.risk', 'Risk Intelligence'), icon: ShieldCheck },
+        { to: '/explorer', label: t('nav.explorer', 'Weather Explorer'), icon: Compass },
+        { to: '/history', label: t('nav.history', 'Disaster History'), icon: History },
+        { to: '/climate', label: t('nav.climate', 'Climate Trends'), icon: TrendingUp },
+        { to: '/locations', label: t('nav.locations', 'Locations'), icon: MapPin },
+        { to: '/settings', label: t('nav.settings', 'Settings'), icon: Settings },
+        { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
+      ]
+    : [
+        { to: '/login', label: 'Sign In', icon: LogIn },
+        { to: '/register', label: 'Create Account', icon: UserPlus },
+        { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
+      ];
 
   return (
     <>
@@ -145,6 +160,21 @@ export const MobileNav: React.FC = () => {
                   </Link>
                 );
               })}
+
+              {isAuthenticated && (
+                <div className="pt-2 border-t border-slate-800">
+                  <button
+                    onClick={async () => {
+                      setIsDrawerOpen(false);
+                      await logout();
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 text-red-400" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-400 font-mono">
@@ -156,4 +186,3 @@ export const MobileNav: React.FC = () => {
     </>
   );
 };
-

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useWeather } from '../context/WeatherContext';
+import { useAuth } from '../context/AuthContext';
 import { CurrentWeatherHero } from '../components/weather/CurrentWeatherHero';
 import { AtmosphericMetricCard } from '../components/weather/AtmosphericMetricCard';
 import { AirQualityIndexCard } from '../components/weather/AirQualityIndexCard';
@@ -20,20 +21,50 @@ import {
   Sun,
   Eye,
   Cloud,
-  Thermometer,
   Bot,
   RefreshCw,
-  AlertTriangle,
+  MapPin,
+  Search,
+  AlertCircle,
+  X,
+  Navigation,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 
 export const DashboardPage: React.FC = () => {
-  const { weather, forecast, risk, loading, error, refreshData } = useWeather();
+  const { user } = useAuth();
+  const {
+    weather,
+    forecast,
+    risk,
+    loading,
+    error,
+    refreshData,
+    isUsingCurrentLocation,
+    detectAndSetCurrentLocation,
+    locationLoading,
+    locationPermissionError,
+    clearLocationError,
+  } = useWeather();
+
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
+
+  // Auto-attempt current location on initial dashboard load if user hasn't explicitly chosen a station
+  useEffect(() => {
+    if (!isUsingCurrentLocation && typeof window !== 'undefined' && 'geolocation' in navigator) {
+      // Non-intrusively check if permission was already granted in browser
+      navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted') {
+          detectAndSetCurrentLocation();
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   if (loading) {
     return (
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+        <Skeleton className="h-16 w-full rounded-2xl" />
         <Skeleton className="h-64 w-full rounded-2xl" />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[...Array(6)].map((_, i) => (
@@ -67,6 +98,92 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Location Permission Notification Banner if denied */}
+      {locationPermissionError && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs text-amber-200 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-300">
+                {locationPermissionError}
+              </p>
+              <p className="text-[11px] text-amber-200/80 mt-0.5">
+                Location access was not granted. You can select an observatory or city manually below.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/locations">
+              <button className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold transition-colors">
+                Select City Manually
+              </button>
+            </Link>
+            <button
+              onClick={clearLocationError}
+              className="p-1 text-amber-400 hover:text-white rounded-lg"
+              aria-label="Dismiss message"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top Personalized Welcome & Location Controller Banner (Section 11 Requirement) */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-navy-900/95 via-navy-850 to-navy-900/95 border border-slate-700/80 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30">
+              Live Weather Station
+            </span>
+            {isUsingCurrentLocation ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <Navigation className="w-3 h-3 text-emerald-400 animate-pulse" />
+                Current Location (GPS Live)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                <Compass className="w-3 h-3 text-sky-400" />
+                Selected Observatory
+              </span>
+            )}
+          </div>
+
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white mt-1.5 tracking-tight font-sans">
+            Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400">{user?.name || 'Citizen Meteorologist'}</span>
+          </h1>
+
+          <p className="text-xs sm:text-sm text-slate-300 mt-1 flex items-center gap-1.5">
+            <MapPin className="w-4 h-4 text-sky-400 shrink-0" />
+            <span>Currently viewing telemetry for <strong className="text-white font-bold">{weather.locationName}</strong>, {weather.district} ({weather.state})</span>
+          </p>
+        </div>
+
+        {/* Location Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant={isUsingCurrentLocation ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={detectAndSetCurrentLocation}
+            disabled={locationLoading}
+            className="shadow-sm"
+            icon={<MapPin className={`w-4 h-4 text-emerald-400 ${locationLoading ? 'animate-bounce' : ''}`} />}
+          >
+            {locationLoading ? 'Acquiring GPS...' : '📍 Use My Current Location'}
+          </Button>
+
+          <Link href="/locations">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Search className="w-4 h-4 text-sky-400" />}
+            >
+              🔎 Search Location
+            </Button>
+          </Link>
+        </div>
+      </div>
+
       {/* Active Disaster Alert Ticker if relevant */}
       {locationAlert && <AlertBanner alert={locationAlert} />}
 
@@ -94,7 +211,7 @@ export const DashboardPage: React.FC = () => {
             value={weather.humidity}
             unit="%"
             icon={<Droplets className="w-4 h-4 text-sky-400" />}
-            subtitle="Dew pt: 25.1°C"
+            subtitle={`Dew pt: ${weather.dewPoint}°C`}
             statusBadge={{ text: weather.humidity > 75 ? 'Elevated' : 'Normal', color: 'sky' }}
           />
           <AtmosphericMetricCard
@@ -135,7 +252,7 @@ export const DashboardPage: React.FC = () => {
             unit="%"
             icon={<Cloud className="w-4 h-4 text-slate-400" />}
             subtitle="Cumulonimbus bands"
-            statusBadge={{ text: 'Overcast', color: 'sky' }}
+            statusBadge={{ text: weather.cloudCover > 60 ? 'Overcast' : 'Scattered', color: 'sky' }}
           />
         </div>
       </div>
@@ -168,7 +285,7 @@ export const DashboardPage: React.FC = () => {
               <h4 className="text-sm font-bold text-white">Ask WeatherGPT about this area</h4>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Have specific questions about tomorrow's rainfall, waterlogging threats, or agricultural recommendations?
+              Have specific questions about {weather.locationName}'s rainfall probability, waterlogging threats, or agricultural advisories?
             </p>
             <Link href="/chat" className="block pt-1">
               <Button variant="primary" size="sm" className="w-full" icon={<Bot className="w-4 h-4" />}>

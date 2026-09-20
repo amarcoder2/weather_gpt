@@ -23,6 +23,7 @@ import {
   Compass,
   FileCheck,
   Zap,
+  Navigation,
 } from 'lucide-react';
 
 const AtmosphericGlobe = dynamic(
@@ -34,7 +35,7 @@ const AtmosphericGlobe = dynamic(
 );
 
 export const LandingPage: React.FC = () => {
-  const { setActiveLocationId } = useWeather();
+  const { setActiveLocationId, detectAndSetCurrentLocation, locationLoading } = useWeather();
   const router = useRouter();
 
   const handleSelectLocation = (locId: string) => {
@@ -97,6 +98,18 @@ export const LandingPage: React.FC = () => {
                   Explore Weather Command Center
                 </Button>
               </Link>
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={async () => {
+                  await detectAndSetCurrentLocation();
+                  router.push('/dashboard');
+                }}
+                disabled={locationLoading}
+                icon={<Navigation className="w-4 h-4 text-emerald-400" />}
+              >
+                {locationLoading ? 'Acquiring GPS...' : '📍 Detect My Location'}
+              </Button>
               <Link href="/chat">
                 <Button size="lg" variant="secondary" icon={<Bot className="w-4 h-4 text-purple-400" />}>
                   Ask WeatherGPT
@@ -107,9 +120,19 @@ export const LandingPage: React.FC = () => {
             {/* Quick Location Pills */}
             <div className="pt-4 border-t border-slate-800/80">
               <span className="text-xs text-slate-400 block mb-2 font-medium">
-                Jump to Meteorological Station:
+                Jump to Meteorological Station or Real-Time Coordinates:
               </span>
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={async () => {
+                    await detectAndSetCurrentLocation();
+                    router.push('/dashboard');
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors font-semibold flex items-center gap-1.5"
+                >
+                  <Navigation className="w-3 h-3 text-emerald-400" />
+                  <span>📍 Current Location (GPS)</span>
+                </button>
                 {DEFAULT_LOCATIONS.map((loc) => (
                   <button
                     key={loc.id}

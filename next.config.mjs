@@ -5,6 +5,7 @@ const nextConfig = {
     unoptimized: true,
   },
   transpilePackages: ['three'],
+  serverExternalPackages: ['pg', 'bcryptjs'],
 };
 
 export default nextConfig;

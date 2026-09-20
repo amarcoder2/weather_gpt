@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
 import { HistoricalDisastersPage } from '@/views/HistoricalDisastersPage';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export const metadata: Metadata = {
-  title: 'Historical Disaster Archives | WeatherGPT',
-  description: 'Historical disaster analysis, post-event reports, and longitudinal weather patterns.',
+  title: 'Disaster History & Case Studies | WeatherGPT',
+  description: 'Historical archive of major cyclonic storms, extreme floods, and heatwave events across India.',
 };
 
 export default function History() {
-  return <HistoricalDisastersPage />;
+  return (
+    <AuthGuard>
+      <HistoricalDisastersPage />
+    </AuthGuard>
+  );
 }

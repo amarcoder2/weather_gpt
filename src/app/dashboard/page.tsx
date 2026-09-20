@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DashboardPage } from '@/views/DashboardPage';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export const metadata: Metadata = {
   title: 'Operational Dashboard | WeatherGPT',
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function Dashboard() {
-  return <DashboardPage />;
+  return (
+    <AuthGuard>
+      <DashboardPage />
+    </AuthGuard>
+  );
 }

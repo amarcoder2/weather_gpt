@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ForecastPage } from '@/views/ForecastPage';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export const metadata: Metadata = {
   title: 'Forecast Intelligence | WeatherGPT',
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function Forecast() {
-  return <ForecastPage />;
+  return (
+    <AuthGuard>
+      <ForecastPage />
+    </AuthGuard>
+  );
 }

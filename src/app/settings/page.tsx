@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
 import { SettingsPage } from '@/views/SettingsPage';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export const metadata: Metadata = {
-  title: 'Platform Preferences & Settings | WeatherGPT',
-  description: 'Configure meteorological alert thresholds, telemetry units, language, and display settings.',
+  title: 'User Preferences & Settings | WeatherGPT',
+  description: 'Manage telemetry unit systems, language preferences, emergency notification thresholds, and voice speeds.',
 };
 
 export default function Settings() {
-  return <SettingsPage />;
+  return (
+    <AuthGuard>
+      <SettingsPage />
+    </AuthGuard>
+  );
 }

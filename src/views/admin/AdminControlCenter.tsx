@@ -503,7 +503,7 @@ export const AdminControlCenter: React.FC = () => {
   }
 
   // If role is plain citizen USER, show Server-Side Gating Barrier
-  if (currentRole === 'USER' || (Boolean(currentUser) && authRole === 'USER')) {
+  if (currentRole === 'USER' || (Boolean(currentUser) && (authRole === 'USER' || (authRole as string) === 'user'))) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-navy-900/90 border border-red-500/40 rounded-2xl p-8 text-center shadow-2xl backdrop-blur-md">
@@ -517,7 +517,7 @@ export const AdminControlCenter: React.FC = () => {
           <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-left text-xs mb-6 font-mono text-slate-300">
             <div className="text-red-400 font-bold mb-1">SECURITY GATE ENFORCEMENT:</div>
             <div>• Required: ANALYST, ADMIN, or SUPER_ADMIN</div>
-            <div>• Provided: role="USER" {currentUser ? `(${currentUser.email || currentUser.uid})` : '(uid: demo_user)'}</div>
+            <div>• Provided: role="USER" {currentUser ? `(${currentUser.email || currentUser.id})` : '(uid: demo_user)'}</div>
             <div>• Audit Event: REJECTED_UNAUTHORIZED_ACCESS</div>
           </div>
           <p className="text-xs text-slate-500 mb-4">

@@ -46,6 +46,26 @@ class LocationService implements ILocationService {
 
   async getLocationById(id: string): Promise<LocationInfo | undefined> {
     const key = id.toLowerCase();
+    if (key === 'current-location' || key === 'current') {
+      try {
+        const cached = localStorage.getItem('weathergpt_cached_current_location');
+        if (cached) {
+          return JSON.parse(cached) as LocationInfo;
+        }
+      } catch {
+        // Fallback
+      }
+      return {
+        id: 'current-location',
+        name: 'Current Location',
+        district: 'Local Area',
+        state: 'India',
+        lat: 20.2961,
+        lon: 85.8245,
+        stationCode: 'GPS',
+      };
+    }
+
     try {
       const res = await apiClient.get<LocationInfo>(`/locations/${encodeURIComponent(key)}`);
       if (res.success && res.data) {
