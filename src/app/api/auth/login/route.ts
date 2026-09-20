@@ -74,10 +74,11 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Login API error:', err);
+    const message = err instanceof Error ? err.message : 'Internal server error while processing login.';
     return NextResponse.json(
-      { error: 'Internal server error while processing login.' },
+      { error: message },
       { status: 500 }
     );
   }

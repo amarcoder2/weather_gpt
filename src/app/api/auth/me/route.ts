@@ -38,10 +38,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       user: safeUser,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Auth /me API error:', err);
+    const message = err instanceof Error ? err.message : 'Internal server error while fetching session profile.';
     return NextResponse.json(
-      { error: 'Internal server error while fetching session profile.' },
+      { error: message },
       { status: 500 }
     );
   }

@@ -53,10 +53,11 @@ export async function POST(req: NextRequest) {
       { message: 'Account created successfully. You can now log in.' },
       { status: 201 }
     );
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Registration API error:', err);
+    const message = err instanceof Error ? err.message : 'Internal server error while processing registration.';
     return NextResponse.json(
-      { error: 'Internal server error while processing registration.' },
+      { error: message },
       { status: 500 }
     );
   }
