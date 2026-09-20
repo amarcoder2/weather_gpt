@@ -249,7 +249,14 @@ export const userRepository = {
 
   async updateLocation(
     id: string,
-    locationData: { latitude: number; longitude: number; location_name: string }
+    locationData: {
+      latitude: number;
+      longitude: number;
+      location_name: string;
+      fallbackEmail?: string;
+      fallbackName?: string;
+      fallbackRole?: string;
+    }
   ): Promise<DbUser | null> {
     await initDatabase();
     const now = new Date().toISOString();
@@ -273,15 +280,24 @@ export const userRepository = {
       }
     }
 
-    const u = getTmpUserById(id);
-    if (u) {
-      u.latitude = locationData.latitude;
-      u.longitude = locationData.longitude;
-      u.location_name = locationData.location_name;
-      u.location_updated_at = now;
-      saveTmpUser(u);
-      return u;
+    let u = getTmpUserById(id);
+    if (!u) {
+      u = {
+        id,
+        name: locationData.fallbackName || 'WeatherGPT User',
+        email: locationData.fallbackEmail || `user_${id}@weathergpt.gov.in`,
+        password_hash: '',
+        role: (locationData.fallbackRole as any) || 'user',
+        created_at: now,
+        last_login: now,
+      };
     }
-    return null;
+
+    u.latitude = locationData.latitude;
+    u.longitude = locationData.longitude;
+    u.location_name = locationData.location_name;
+    u.location_updated_at = now;
+    saveTmpUser(u);
+    return u;
   },
 };

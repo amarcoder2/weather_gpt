@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
       latitude,
       longitude,
       location_name: location_name.trim(),
+      fallbackEmail: payload.email,
+      fallbackName: payload.name,
+      fallbackRole: payload.role,
     });
 
     if (!updated) {
