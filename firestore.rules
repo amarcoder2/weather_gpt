@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================================
+    // HELPER FUNCTIONS & RBAC EVALUATION
+    // ============================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Role checks inspect verified Firebase Auth custom claims, NOT client data
+    function getUserRole() {
+      return isAuthenticated() && ('role' in request.auth.token) ? request.auth.token.role : 'USER';
+    }
+
+    function isModerator() {
+      return isAuthenticated() && (getUserRole() in ['MODERATOR', 'ADMIN', 'SUPER_ADMIN']);
+    }
+
+    function isAnalyst() {
+      return isAuthenticated() && (getUserRole() in ['ANALYST', 'ADMIN', 'SUPER_ADMIN']);
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (getUserRole() in ['ADMIN', 'SUPER_ADMIN']);
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (getUserRole() == 'SUPER_ADMIN');
+    }
+
+    // ============================================================================
+    // 1. DEFAULT DENY
+    // ============================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ============================================================================
+    // 2. USERS & PROFILES
+    // ============================================================================
+    match /users/{userId} {
+      // Users can read their own profile; Admins can view any user
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Users can update their preferences but CANNOT change their own role or status
+      allow update: if isOwner(userId) 
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'createdAt'])
+        || isSuperAdmin();
+
+      // Create only allowed on initial auth registration for self
+      allow create: if isOwner(userId)
+        && (!('role' in request.resource.data)
+            || request.resource.data.role == 'USER')
+        && (!('status' in request.resource.data)
+            || request.resource.data.status == 'ACTIVE')
+        || isSuperAdmin();
+
+      // Deletion only by Super Admin
+      allow delete: if isSuperAdmin();
+
+      // Subcollection: Saved Locations
+      match /savedLocations/{locationId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // ============================================================================
+    // 3. LOCATIONS (GEOGRAPHIC REGISTRY)
+    // ============================================================================
+    match /locations/{locationId} {
+      // Public read for tracked locations
+      allow read: if true;
+      // Managed only by Admins or backend ingestion services
+      allow create, update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
+    // 4. WEATHER OBSERVATIONS & FORECASTS
+    // ============================================================================
+    match /weatherObservations/{observationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /forecasts/{forecastId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /climateRecords/{recordId} {
+      allow read: if true;
+      allow write: if isAnalyst();
+    }
+
+    // ============================================================================
+    // 5. WEATHER & DISASTER ALERTS
+    // ============================================================================
+    match /alerts/{alertId} {
+      // Public can read active alerts only; Staff/Admins can read drafts & pending reviews
+      allow read: if (resource.data.status == 'ACTIVE') || isAnalyst();
+
+      // Analysts can draft or submit alerts for review
+      allow create: if isAnalyst() && request.resource.data.status in ['DRAFT', 'PENDING_REVIEW'];
+
+      // Only Admins / Super Admins can activate or cancel alerts
+      allow update: if (isAdmin())
+        || (isAnalyst() && resource.data.status in ['DRAFT', 'PENDING_REVIEW'] 
+            && request.resource.data.status in ['DRAFT', 'PENDING_REVIEW']);
+
+      // Hard deletion is prohibited; must use cancellation/expiry
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
+    // 6. HISTORICAL DISASTER CATALOG
+    // ============================================================================
+    match /disasters/{disasterId} {
+      allow read: if true;
+      allow create, update: if isAnalyst();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
+    // 7. RISK ASSESSMENTS
+    // ============================================================================
+    match /riskAssessments/{assessmentId} {
+      allow read: if true;
+      allow write: if isAnalyst();
+    }
+
+    // ============================================================================
+    // 8. CHAT SESSIONS & MESSAGES
+    // ============================================================================
+    match /chatSessions/{sessionId} {
+      allow read: if isOwner(resource.data.userId) || isModerator();
+
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if (
+        isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+      ) || isModerator();
+
+      allow delete: if isOwner(resource.data.userId) || isModerator();
+
+      match /messages/{messageId} {
+        allow read, write: if (
+          isAuthenticated()
+          && get(
+            /databases/$(database)/documents/chatSessions/$(sessionId)
+          ).data.userId == request.auth.uid
+        ) || isModerator();
+      }
+    }
+
+    // ============================================================================
+    // 9. AUDIT LOGS (APPEND-ONLY, IMMUTABLE)
+    // ============================================================================
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+
+      // Client writes are forbidden.
+      // Cloud Functions using Firebase Admin SDK bypass Firestore rules.
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // 10. SYSTEM CONFIG & METRICS
+    // ============================================================================
+    match /systemConfig/{configId} {
+      allow read: if isAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    match /systemMetrics/{metricId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /dataSources/{sourceId} {
+      allow read: if isAnalyst();
+      allow write: if isAdmin();
+    }
+
+    match /mediaAssets/{assetId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
