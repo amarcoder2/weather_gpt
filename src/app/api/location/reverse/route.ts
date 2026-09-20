@@ -67,8 +67,8 @@ function findNearestFallback(lat: number, lon: number): ReverseGeocodeResponse {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const latParam = searchParams.get('latitude');
-    const lonParam = searchParams.get('longitude');
+    const latParam = searchParams.get('latitude') || searchParams.get('lat');
+    const lonParam = searchParams.get('longitude') || searchParams.get('lon');
 
     if (!latParam || !lonParam) {
       return NextResponse.json(
