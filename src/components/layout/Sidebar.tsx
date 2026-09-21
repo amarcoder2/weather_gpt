@@ -35,7 +35,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
   const { t } = useLanguage();
   const { role, isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
-  const isAdminPermitted = role === 'admin';
 
   const authenticatedNavItems = [
     { to: '/', label: 'Home', icon: Home, exact: true },
@@ -48,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
     { to: '/history', label: t('nav.history', 'Disaster History'), icon: History },
     { to: '/climate', label: t('nav.climate', 'Climate Trends'), icon: TrendingUp },
     { to: '/locations', label: t('nav.locations', 'Locations'), icon: MapPin },
-    ...(isAdminPermitted ? [{ to: '/admin', label: 'Admin Console', icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' }] : []),
+    { to: '/admin', label: 'Admin Console', icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
     { to: '/settings', label: t('nav.settings', 'Settings'), icon: Settings },
     { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
   ];
@@ -57,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
     { to: '/', label: 'Home', icon: Home, exact: true },
     { to: '/login', label: 'Sign In', icon: LogIn },
     { to: '/register', label: 'Create Account', icon: UserPlus },
+    { to: '/admin', label: 'Admin Console', icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
     { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
   ];
 

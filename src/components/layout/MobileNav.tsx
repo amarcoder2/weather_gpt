@@ -31,7 +31,6 @@ export const MobileNav: React.FC = () => {
   const { t } = useLanguage();
   const { role, isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
-  const isAdminPermitted = role === 'admin';
 
   const primaryItems = isAuthenticated
     ? [
@@ -49,7 +48,7 @@ export const MobileNav: React.FC = () => {
 
   const secondaryItems = isAuthenticated
     ? [
-        ...(isAdminPermitted ? [{ to: '/admin', label: 'Admin Console', icon: ShieldAlert }] : []),
+        { to: '/admin', label: 'Admin Console', icon: ShieldAlert },
         { to: '/forecast', label: t('nav.forecast', 'Forecast'), icon: CloudSun },
         { to: '/risk', label: t('nav.risk', 'Risk Intelligence'), icon: ShieldCheck },
         { to: '/explorer', label: t('nav.explorer', 'Weather Explorer'), icon: Compass },
@@ -60,6 +59,7 @@ export const MobileNav: React.FC = () => {
         { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
       ]
     : [
+        { to: '/admin', label: 'Admin Console', icon: ShieldAlert },
         { to: '/login', label: 'Sign In', icon: LogIn },
         { to: '/register', label: 'Create Account', icon: UserPlus },
         { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },

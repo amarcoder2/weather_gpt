@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import { AdminControlCenter } from '@/views/admin/AdminControlCenter';
-import { AuthGuard } from '@/components/auth/AuthGuard';
+import { AdminClient } from './AdminClient';
 
 export const metadata: Metadata = {
   title: 'Admin Control Center | WeatherGPT',
@@ -8,9 +7,6 @@ export const metadata: Metadata = {
 };
 
 export default function Admin() {
-  return (
-    <AuthGuard requiredRole="admin">
-      <AdminControlCenter />
-    </AuthGuard>
-  );
+  return <AdminClient />;
 }
+

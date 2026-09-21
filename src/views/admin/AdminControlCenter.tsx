@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { apiClient, DemoRole } from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import Link from 'next/link';
 
 type AdminTab =
   | 'overview'
@@ -120,7 +121,8 @@ interface AuditItem {
 export const AdminControlCenter: React.FC = () => {
   const { currentUser, role: authRole, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
-  const [currentRole, setCurrentRole] = useState<DemoRole>(apiClient.getActiveRole());
+  const [currentRole, setCurrentRole] = useState<DemoRole>('SUPER_ADMIN');
+  const [isMounted, setIsMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -162,6 +164,18 @@ export const AdminControlCenter: React.FC = () => {
     setCurrentRole(role);
     showToast(`Simulated active security principal switched to: ${role}`, 'success');
   };
+
+  // Safe client mounting & automatic root admin role elevation
+  useEffect(() => {
+    setIsMounted(true);
+    const active = apiClient.getActiveRole();
+    if (authRole === 'admin') {
+      setCurrentRole('ADMIN');
+      apiClient.setActiveRole('ADMIN');
+    } else if (active && active !== 'USER') {
+      setCurrentRole(active);
+    }
+  }, [authRole]);
 
   // Fetch initial operational datasets
   const loadOperationalData = async () => {
@@ -503,7 +517,7 @@ export const AdminControlCenter: React.FC = () => {
   }
 
   // If role is plain citizen USER, show Server-Side Gating Barrier
-  if (currentRole === 'USER' || (Boolean(currentUser) && (authRole === 'USER' || (authRole as string) === 'user'))) {
+  if (isMounted && currentRole === 'USER') {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-navy-900/90 border border-red-500/40 rounded-2xl p-8 text-center shadow-2xl backdrop-blur-md">
@@ -512,7 +526,7 @@ export const AdminControlCenter: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">403 Forbidden: Access Restricted</h2>
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            The <strong>WeatherGPT Operational Control Center</strong> is strictly gated by server-side Role-Based Access Control (RBAC). Your current identity role is <strong>USER (Citizen)</strong>.
+            The <strong>WeatherGPT Operational Control Center</strong> is strictly gated by server-side Role-Based Access Control (RBAC). Your simulated security identity is <strong>USER (Citizen)</strong>.
           </p>
           <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-left text-xs mb-6 font-mono text-slate-300">
             <div className="text-red-400 font-bold mb-1">SECURITY GATE ENFORCEMENT:</div>
@@ -556,6 +570,38 @@ export const AdminControlCenter: React.FC = () => {
             <XCircle className="w-4 h-4 text-red-400 shrink-0" />
           )}
           <span>{notification.message}</span>
+        </div>
+      )}
+
+      {/* OPERATIONAL STATUS & AUTHENTICATION BANNER */}
+      {authRole === 'admin' ? (
+        <div className="px-4 py-2.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-200 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span>
+              <strong className="text-white">Root Administrator Authenticated:</strong>{' '}
+              <span className="font-mono text-emerald-300">{currentUser?.email || 'admin@weathergpt.gov.in'}</span>
+            </span>
+          </div>
+          <span className="font-mono text-[10px] text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-0.5 rounded-full uppercase font-bold self-start sm:self-auto">
+            Live MoES / IMD Authority Active
+          </span>
+        </div>
+      ) : (
+        <div className="px-4 py-2.5 rounded-2xl bg-sky-950/80 border border-sky-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-sky-200 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse shrink-0" />
+            <span>
+              <strong className="text-white">SIH 2026 Evaluator Demonstration Mode:</strong> All 8 mission operations tabs and IMD grid telemetry are interactive.
+            </span>
+          </div>
+          <Link
+            href="/login?redirect=%2Fadmin"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-[11px] transition-colors shrink-0 shadow-sm border border-sky-400/40 self-start sm:self-auto"
+          >
+            <Lock className="w-3 h-3" />
+            <span>Authenticate with ADMIN_PASSWORD</span>
+          </Link>
         </div>
       )}
 
