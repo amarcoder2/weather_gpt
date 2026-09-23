@@ -70,9 +70,19 @@ export async function POST(req: NextRequest) {
       message: errorMessage,
     });
 
+    const safeCode = typeof errorCode === 'string' ? errorCode : (err as { name?: string })?.name || 'INTERNAL_ERROR';
+
     return NextResponse.json(
-      { error: 'An unexpected error occurred while processing your registration. Please try again.' },
-      { status: 500 }
+      {
+        error: 'An unexpected error occurred while processing your registration. Please try again.',
+        diagnosticCode: safeCode,
+      },
+      {
+        status: 500,
+        headers: {
+          'X-Registration-Error-Code': safeCode,
+        },
+      }
     );
   }
 }

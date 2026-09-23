@@ -12,7 +12,24 @@ const isProduction = process.env.NODE_ENV === 'production';
 const devMemoryUsers = new Map<string, DbUser>();
 
 function getDbUrl(): string | undefined {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL;
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
+  ].filter((u): u is string => Boolean(u && u.trim().length > 0));
+
+  if (candidates.length === 0) return undefined;
+
+  // In production, prioritize remote cloud databases over localhost/127.0.0.1
+  if (isProduction) {
+    const cloudCandidate = candidates.find(
+      (u) => !u.includes('localhost') && !u.includes('127.0.0.1')
+    );
+    if (cloudCandidate) return cloudCandidate;
+  }
+
+  return candidates[0];
 }
 
 export function getPool(): Pool | null {
@@ -30,6 +47,12 @@ export function getPool(): Pool | null {
   if (!pool) {
     const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
     const sslModeDisable = dbUrl.includes('sslmode=disable');
+    if (isProduction && isLocalhost) {
+      console.error(
+        '[PostgreSQL Warning] DATABASE_URL points to localhost/127.0.0.1 in production serverless runtime.'
+      );
+    }
+
     pool = new Pool({
       connectionString: dbUrl,
       ssl: isLocalhost || sslModeDisable ? false : { rejectUnauthorized: false },
@@ -74,6 +97,20 @@ export async function initDatabase(): Promise<void> {
       const usersExist = Boolean(probe.rows[0]?.exists);
 
       if (usersExist) {
+        // Fast ensure of supplementary columns on existing table
+        try {
+          await dbPool.query(`
+            ALTER TABLE users
+              ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+              ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+              ADD COLUMN IF NOT EXISTS location_name VARCHAR(255),
+              ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE,
+              ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'
+          `);
+        } catch {
+          // Columns may already exist or table may be locked; non-blocking
+        }
+
         isInitialized = true;
         // Lazy-trigger secure Super Admin bootstrap if configured in environment
         import('../auth/bootstrap')
@@ -270,24 +307,56 @@ export const userRepository = {
     const dbPool = getPool();
 
     if (dbPool) {
-      await dbPool.query(
-        `INSERT INTO users (id, name, email, password_hash, role, latitude, longitude, location_name, location_updated_at, created_at, last_login)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          newUser.id,
-          newUser.name,
-          newUser.email,
-          newUser.password_hash,
-          newUser.role || 'user',
-          newUser.latitude || null,
-          newUser.longitude || null,
-          newUser.location_name || null,
-          newUser.location_updated_at || null,
-          newUser.created_at,
-          newUser.last_login,
-        ]
-      );
-      return newUser;
+      try {
+        await dbPool.query(
+          `INSERT INTO users (id, name, email, password_hash, role, latitude, longitude, location_name, location_updated_at, created_at, last_login)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            newUser.id,
+            newUser.name,
+            newUser.email,
+            newUser.password_hash,
+            newUser.role || 'user',
+            newUser.latitude || null,
+            newUser.longitude || null,
+            newUser.location_name || null,
+            newUser.location_updated_at || null,
+            newUser.created_at,
+            newUser.last_login,
+          ]
+        );
+        return newUser;
+      } catch (insErr: unknown) {
+        const err = insErr as { code?: string; message?: string };
+        // If column does not exist on legacy table (PostgreSQL code 42703), fallback to core insertion
+        if (err?.code === '42703') {
+          console.warn('[PostgreSQL] Supplementary column missing on users table, falling back to core insertion:', err.message);
+          await dbPool.query(
+            `INSERT INTO users (id, name, email, password_hash, role, created_at, last_login)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              newUser.id,
+              newUser.name,
+              newUser.email,
+              newUser.password_hash,
+              newUser.role || 'user',
+              newUser.created_at,
+              newUser.last_login,
+            ]
+          );
+          // Apply schema upgrade in background
+          dbPool.query(`
+            ALTER TABLE users
+              ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
+              ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
+              ADD COLUMN IF NOT EXISTS location_name VARCHAR(255),
+              ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE,
+              ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'
+          `).catch(() => {});
+          return newUser;
+        }
+        throw insErr;
+      }
     }
 
     if (isProduction) {
