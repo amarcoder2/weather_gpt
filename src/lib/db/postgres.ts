@@ -5,6 +5,7 @@ import { DEFAULT_LOCATIONS } from '../../config/constants';
 
 let pool: Pool | null = null;
 let isInitialized = false;
+let initPromise: Promise<void> | null = null;
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -70,74 +71,67 @@ export function getPool(): Pool | null {
 
 export async function initDatabase(): Promise<void> {
   if (isInitialized) return;
+  if (initPromise) return initPromise;
 
-  const dbUrl = getDbUrl();
+  initPromise = (async () => {
+    const dbUrl = getDbUrl();
 
-  if (!dbUrl) {
-    if (isProduction) {
-      throw new Error(
-        'DATABASE_URL is required in production environment. Refusing to operate with fallback storage.'
-      );
-    }
-    console.warn(
-      '[WeatherGPT DB Development] DATABASE_URL not detected. Operating with isolated in-memory development cache.'
-    );
-    isInitialized = true;
-    return;
-  }
-
-  const dbPool = getPool();
-  if (dbPool) {
-    try {
-      // Fast probe: check if users table already exists (single round-trip, no heavy DDL lock on cold start)
-      const probe = await dbPool.query(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') AS exists"
-      );
-
-      const usersExist = Boolean(probe.rows[0]?.exists);
-
-      if (usersExist) {
-        // Fast ensure of supplementary columns on existing table
-        try {
-          await dbPool.query(`
-            ALTER TABLE users
-              ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
-              ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
-              ADD COLUMN IF NOT EXISTS location_name VARCHAR(255),
-              ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE,
-              ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'
-          `);
-        } catch {
-          // Columns may already exist or table may be locked; non-blocking
-        }
-
-        isInitialized = true;
-        // Lazy-trigger secure Super Admin bootstrap if configured in environment
-        import('../auth/bootstrap')
-          .then((mod) => mod.bootstrapSuperAdminAccount())
-          .catch((err) => console.warn('[Security Bootstrap] Background trigger notice:', err?.message || err));
-        return;
+    if (!dbUrl) {
+      if (isProduction) {
+        throw new Error(
+          'DATABASE_URL is required in production environment. Refusing to operate with fallback storage.'
+        );
       }
+      console.warn(
+        '[WeatherGPT DB Development] DATABASE_URL not detected. Operating with isolated in-memory development cache.'
+      );
+      isInitialized = true;
+      return;
+    }
 
-      // Initial migration: Execute single statements individually for PgBouncer / pooler compatibility
-      // 1. Create users table if not exists with UNIQUE email
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id VARCHAR(64) PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          role VARCHAR(50) DEFAULT 'user',
-          latitude DOUBLE PRECISION,
-          longitude DOUBLE PRECISION,
-          location_name VARCHAR(255),
-          location_updated_at TIMESTAMP WITH TIME ZONE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          last_login TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
+    const dbPool = getPool();
+    if (!dbPool) {
+      if (isProduction) {
+        throw new Error('Database pool could not be initialized in production.');
+      }
+      isInitialized = true;
+      return;
+    }
+
+    try {
+      // 1. Single round-trip probe: Check status of core WeatherGPT tables in current search_path
+      const probe = await dbPool.query(`
+        SELECT
+          (to_regclass('users') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users')) AS users_exist,
+          (to_regclass('locations') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'locations')) AS locations_exist,
+          (to_regclass('audit_logs') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'audit_logs')) AS audit_logs_exist
       `);
 
-      // 2. Ensure supplementary columns exist on users (each statement executed separately)
+      const usersExist = Boolean(probe.rows[0]?.users_exist);
+      const locationsExist = Boolean(probe.rows[0]?.locations_exist);
+      const auditLogsExist = Boolean(probe.rows[0]?.audit_logs_exist);
+
+      // 2. Provision or upgrade users table (atomic 12-column schema)
+      if (!usersExist) {
+        await dbPool.query(`
+          CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role VARCHAR(50) DEFAULT 'user',
+            latitude DOUBLE PRECISION,
+            longitude DOUBLE PRECISION,
+            location_name VARCHAR(255),
+            location_updated_at TIMESTAMP WITH TIME ZONE,
+            status VARCHAR(50) DEFAULT 'ACTIVE',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+      }
+
+      // Ensure all 12 columns exist on users (vital for legacy or partially provisioned tables)
       const supplementaryColumns = [
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION',
         'ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION',
@@ -148,73 +142,129 @@ export async function initDatabase(): Promise<void> {
       for (const alterSql of supplementaryColumns) {
         try {
           await dbPool.query(alterSql);
-        } catch {
-          // Column may already exist
+        } catch (alterErr: unknown) {
+          const err = alterErr as { code?: string; message?: string };
+          const isDuplicateColumn =
+            err.code === '42701' ||
+            (typeof err.message === 'string' && err.message.toLowerCase().includes('already exists'));
+          if (!isDuplicateColumn) {
+            console.error('[PostgreSQL] Supplementary column ALTER TABLE failed:', err.message || err);
+            throw alterErr;
+          }
         }
       }
 
-      // 3. User performance indices (each statement executed separately)
-      try {
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email))');
-      } catch {}
-      try {
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_users_role ON users (role)');
-      } catch {}
+      // 3. User performance indices (single-statement executions)
+      const userIndices = [
+        'CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email))',
+        'CREATE INDEX IF NOT EXISTS idx_users_role ON users (role)',
+      ];
+      for (const idxSql of userIndices) {
+        try {
+          await dbPool.query(idxSql);
+        } catch (idxErr: unknown) {
+          const err = idxErr as { code?: string; message?: string };
+          const isHarmless =
+            err.code === '42P07' ||
+            (typeof err.message === 'string' && err.message.toLowerCase().includes('already exists'));
+          if (!isHarmless) {
+            console.warn('[PostgreSQL] User index creation notice:', err.message || err);
+          }
+        }
+      }
 
-      // 4. Provision nationwide locations catalog (single-statement execution)
-      try {
-        await dbPool.query(`
-          CREATE TABLE IF NOT EXISTS locations (
-            id VARCHAR(64) PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            normalized_name VARCHAR(255) NOT NULL,
-            state VARCHAR(150) NOT NULL,
-            state_code VARCHAR(10),
-            district VARCHAR(150) NOT NULL,
-            district_code VARCHAR(20),
-            locality_type VARCHAR(50) NOT NULL DEFAULT 'City',
-            latitude DOUBLE PRECISION NOT NULL,
-            longitude DOUBLE PRECISION NOT NULL,
-            country VARCHAR(10) DEFAULT 'IN',
-            population BIGINT,
-            elevation INTEGER,
-            aliases TEXT,
-            is_active BOOLEAN DEFAULT TRUE,
-            source VARCHAR(100) DEFAULT 'GeoNames-IN-CC-BY-4.0',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT uq_locations_name_state_district UNIQUE (normalized_name, state, district)
-          )
-        `);
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_normalized_name ON locations (normalized_name)');
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_state ON locations (state)');
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_district ON locations (district)');
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_locality_type ON locations (locality_type)');
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_coords ON locations (latitude, longitude)');
-      } catch (locErr) {
-        console.warn('[PostgreSQL] Locations table init notice:', locErr instanceof Error ? locErr.message : 'Unknown');
+      // 4. Provision nationwide locations catalog (idempotent table & index provisioning)
+      if (!locationsExist) {
+        try {
+          await dbPool.query(`
+            CREATE TABLE IF NOT EXISTS locations (
+              id VARCHAR(64) PRIMARY KEY,
+              name VARCHAR(255) NOT NULL,
+              normalized_name VARCHAR(255) NOT NULL,
+              state VARCHAR(150) NOT NULL,
+              state_code VARCHAR(10),
+              district VARCHAR(150) NOT NULL,
+              district_code VARCHAR(20),
+              locality_type VARCHAR(50) NOT NULL DEFAULT 'City',
+              latitude DOUBLE PRECISION NOT NULL,
+              longitude DOUBLE PRECISION NOT NULL,
+              country VARCHAR(10) DEFAULT 'IN',
+              population BIGINT,
+              elevation INTEGER,
+              aliases TEXT,
+              is_active BOOLEAN DEFAULT TRUE,
+              source VARCHAR(100) DEFAULT 'GeoNames-IN-CC-BY-4.0',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              CONSTRAINT uq_locations_name_state_district UNIQUE (normalized_name, state, district)
+            )
+          `);
+        } catch (locErr) {
+          console.warn('[PostgreSQL] Locations table init notice:', locErr instanceof Error ? locErr.message : 'Unknown');
+        }
+      }
+
+      // Ensure locations performance indices independently and idempotently
+      const locationIndices = [
+        'CREATE INDEX IF NOT EXISTS idx_locations_normalized_name ON locations (normalized_name)',
+        'CREATE INDEX IF NOT EXISTS idx_locations_state ON locations (state)',
+        'CREATE INDEX IF NOT EXISTS idx_locations_district ON locations (district)',
+        'CREATE INDEX IF NOT EXISTS idx_locations_locality_type ON locations (locality_type)',
+        'CREATE INDEX IF NOT EXISTS idx_locations_coords ON locations (latitude, longitude)',
+      ];
+      for (const idxSql of locationIndices) {
+        try {
+          await dbPool.query(idxSql);
+        } catch (idxErr: unknown) {
+          const err = idxErr as { code?: string; message?: string };
+          const isHarmless =
+            err.code === '42P07' ||
+            (typeof err.message === 'string' && err.message.toLowerCase().includes('already exists'));
+          if (!isHarmless) {
+            console.warn('[PostgreSQL] Locations index creation notice:', err.message || err);
+          }
+        }
       }
 
       // 5. Provision immutable administrative & security audit trail table
-      try {
-        await dbPool.query(`
-          CREATE TABLE IF NOT EXISTS audit_logs (
-            id VARCHAR(64) PRIMARY KEY,
-            timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            actor_id VARCHAR(64),
-            actor_email VARCHAR(255),
-            actor_role VARCHAR(50),
-            action VARCHAR(100) NOT NULL,
-            resource_type VARCHAR(100),
-            resource_id VARCHAR(255),
-            result VARCHAR(50) DEFAULT 'SUCCESS',
-            details JSONB
-          )
-        `);
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC)');
-        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action)');
-      } catch (audErr) {
-        console.warn('[PostgreSQL] Audit log table init notice:', audErr instanceof Error ? audErr.message : 'Unknown');
+      if (!auditLogsExist) {
+        try {
+          await dbPool.query(`
+            CREATE TABLE IF NOT EXISTS audit_logs (
+              id VARCHAR(64) PRIMARY KEY,
+              timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              actor_id VARCHAR(64),
+              actor_email VARCHAR(255),
+              actor_role VARCHAR(50),
+              action VARCHAR(100) NOT NULL,
+              resource_type VARCHAR(100),
+              resource_id VARCHAR(255),
+              result VARCHAR(50) DEFAULT 'SUCCESS',
+              details JSONB
+            )
+          `);
+        } catch (audErr) {
+          console.warn('[PostgreSQL] Audit log table init notice:', audErr instanceof Error ? audErr.message : 'Unknown');
+        }
+      }
+
+      // Ensure audit logs indices independently and idempotently
+      const auditIndices = [
+        'CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action)',
+      ];
+      for (const idxSql of auditIndices) {
+        try {
+          await dbPool.query(idxSql);
+        } catch (idxErr: unknown) {
+          const err = idxErr as { code?: string; message?: string };
+          const isHarmless =
+            err.code === '42P07' ||
+            (typeof err.message === 'string' && err.message.toLowerCase().includes('already exists'));
+          if (!isHarmless) {
+            console.warn('[PostgreSQL] Audit log index creation notice:', err.message || err);
+          }
+        }
       }
 
       isInitialized = true;
@@ -225,13 +275,12 @@ export async function initDatabase(): Promise<void> {
         .then((mod) => mod.bootstrapSuperAdminAccount())
         .catch((err) => console.warn('[Security Bootstrap] Background trigger notice:', err?.message || err));
 
-      return;
     } catch (err) {
       console.error('[PostgreSQL] Database initialization notice:', err instanceof Error ? err.message : 'Unknown');
       // If users table is accessible, do not crash production
       try {
         const checkAfter = await dbPool.query(
-          "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') AS exists"
+          "SELECT (to_regclass('users') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users')) AS exists"
         );
         if (checkAfter.rows[0]?.exists) {
           isInitialized = true;
@@ -241,12 +290,17 @@ export async function initDatabase(): Promise<void> {
         // Fall through to error
       }
       if (isProduction) {
-        throw new Error('Failed to initialize PostgreSQL database in production environment.');
+        const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+        throw new Error(`Failed to initialize PostgreSQL database in production environment: ${detail}`);
       }
     }
-  }
+  })();
 
-  isInitialized = true;
+  try {
+    await initPromise;
+  } finally {
+    initPromise = null;
+  }
 }
 
 export const userRepository = {
@@ -309,14 +363,15 @@ export const userRepository = {
     if (dbPool) {
       try {
         await dbPool.query(
-          `INSERT INTO users (id, name, email, password_hash, role, latitude, longitude, location_name, location_updated_at, created_at, last_login)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          `INSERT INTO users (id, name, email, password_hash, role, status, latitude, longitude, location_name, location_updated_at, created_at, last_login)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
             newUser.id,
             newUser.name,
             newUser.email,
             newUser.password_hash,
             newUser.role || 'user',
+            newUser.status || 'ACTIVE',
             newUser.latitude || null,
             newUser.longitude || null,
             newUser.location_name || null,

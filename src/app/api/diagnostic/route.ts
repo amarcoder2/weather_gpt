@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPool, userRepository } from '@/lib/db/postgres';
+import { getPool, initDatabase, userRepository } from '@/lib/db/postgres';
 import bcrypt from 'bcryptjs';
 
 export const dynamic = 'force-dynamic';
@@ -75,12 +75,22 @@ export async function GET() {
     serverVersion?: string;
   } = { success: false };
 
-  // Test 2: Schema verification
+  // Test 2: Database Initialization / Migration
+  let initDbResult: {
+    attempted: boolean;
+    success: boolean;
+    errorCode?: string;
+    errorMessage?: string;
+  } = { attempted: false, success: false };
+
+  // Test 3: Schema verification
   let schemaResult: {
     usersTableExists: boolean;
     columns: string[];
     missingColumns: string[];
     userCount: number;
+    locationsTableExists?: boolean;
+    auditLogsTableExists?: boolean;
   } = {
     usersTableExists: false,
     columns: [],
@@ -88,7 +98,7 @@ export async function GET() {
     userCount: 0,
   };
 
-  // Test 3: Operations (findByEmail, bcrypt, dry-run INSERT)
+  // Test 4: Operations (findByEmail, bcrypt, dry-run INSERT)
   let operationsResult: {
     findByEmailSuccess: boolean;
     findByEmailError?: string;
@@ -122,21 +132,41 @@ export async function GET() {
         serverTime: pingRes.rows[0]?.server_time,
         serverVersion: String(pingRes.rows[0]?.server_version || '').split(',')[0],
       };
+    } catch (connErr: unknown) {
+      const err = connErr as { name?: string; code?: string; message?: string };
+      connectivityResult = {
+        success: false,
+        errorName: err.name || 'ConnectionError',
+        errorCode: err.code || 'UNKNOWN',
+        errorMessage: err.message || 'Failed to connect to PostgreSQL',
+      };
+    }
 
-      // Check users table existence
-      const tableCheck = await pool.query(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') AS exists"
-      );
-      const exists = Boolean(tableCheck.rows[0]?.exists);
-      schemaResult.usersTableExists = exists;
+    // Explicitly run schema initialization if connected
+    if (connectivityResult.success) {
+      initDbResult.attempted = true;
+      try {
+        await initDatabase();
+        initDbResult.success = true;
+      } catch (initErr: unknown) {
+        const err = initErr as { code?: string; message?: string };
+        initDbResult.success = false;
+        initDbResult.errorCode = err.code || 'INIT_ERROR';
+        initDbResult.errorMessage = err.message || 'Database initialization threw an error';
+      }
 
-      if (exists) {
-        // Inspect columns
-        const colCheck = await pool.query(
-          "SELECT column_name FROM information_schema.columns WHERE table_name = 'users' ORDER BY ordinal_position"
-        );
-        const presentCols = colCheck.rows.map((r: { column_name: string }) => r.column_name);
-        schemaResult.columns = presentCols;
+      // Check users, locations, and audit_logs tables existence
+      try {
+        const tableCheck = await pool.query(`
+          SELECT
+            (to_regclass('users') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users')) AS users_exist,
+            (to_regclass('locations') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'locations')) AS locations_exist,
+            (to_regclass('audit_logs') IS NOT NULL OR EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'audit_logs')) AS audit_logs_exist
+        `);
+        const usersExist = Boolean(tableCheck.rows[0]?.users_exist);
+        schemaResult.usersTableExists = usersExist;
+        schemaResult.locationsTableExists = Boolean(tableCheck.rows[0]?.locations_exist);
+        schemaResult.auditLogsTableExists = Boolean(tableCheck.rows[0]?.audit_logs_exist);
 
         const expectedCols = [
           'id',
@@ -152,52 +182,61 @@ export async function GET() {
           'created_at',
           'last_login',
         ];
-        schemaResult.missingColumns = expectedCols.filter((col) => !presentCols.includes(col));
 
-        // Count users
-        const countRes = await pool.query('SELECT COUNT(*) as count FROM users');
-        schemaResult.userCount = parseInt(countRes.rows[0]?.count || '0', 10);
+        if (usersExist) {
+          // Inspect columns
+          const colCheck = await pool.query(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'users' ORDER BY ordinal_position"
+          );
+          const presentCols = colCheck.rows.map((r: { column_name: string }) => r.column_name);
+          schemaResult.columns = presentCols;
+          schemaResult.missingColumns = expectedCols.filter((col) => !presentCols.includes(col));
+
+          // Count users
+          const countRes = await pool.query('SELECT COUNT(*) as count FROM users');
+          schemaResult.userCount = parseInt(countRes.rows[0]?.count || '0', 10);
+        } else {
+          schemaResult.missingColumns = expectedCols;
+        }
+      } catch (schemaErr: unknown) {
+        const err = schemaErr as { code?: string; message?: string };
+        console.error('[Diagnostic Probe] Schema probe error:', err.message);
       }
-    } catch (connErr: unknown) {
-      const err = connErr as { name?: string; code?: string; message?: string };
-      connectivityResult = {
-        success: false,
-        errorName: err.name || 'ConnectionError',
-        errorCode: err.code || 'UNKNOWN',
-        errorMessage: err.message || 'Failed to connect to PostgreSQL',
-      };
-    }
 
-    // Operations test: findByEmail
-    try {
-      await userRepository.findByEmail('probe_diagnostic_test@weathergpt.gov.in');
-      operationsResult.findByEmailSuccess = true;
-    } catch (findErr: unknown) {
-      operationsResult.findByEmailSuccess = false;
-      operationsResult.findByEmailError = findErr instanceof Error ? findErr.message : String(findErr);
-    }
-
-    // Operations test: dry-run INSERT in transaction with rollback
-    if (connectivityResult.success && schemaResult.usersTableExists) {
-      const client = await pool.connect();
+      // Operations test: findByEmail
       try {
-        await client.query('BEGIN');
-        const probeId = `probe_${Date.now()}`;
-        const probeEmail = `probe_${Date.now()}@diagnostic.test`;
-        const testRes = await client.query(
-          `INSERT INTO users (id, name, email, password_hash, role, created_at, last_login)
-           VALUES ($1, $2, $3, $4, 'user', NOW(), NOW()) RETURNING id`,
-          [probeId, 'Diagnostic Probe', probeEmail, 'test_hash']
-        );
-        operationsResult.dryRunInsertSuccess = Boolean(testRes.rows[0]?.id);
-        await client.query('ROLLBACK');
-      } catch (insErr: unknown) {
-        await client.query('ROLLBACK').catch(() => {});
-        const err = insErr as { code?: string; message?: string };
+        await userRepository.findByEmail('probe_diagnostic_test@weathergpt.gov.in');
+        operationsResult.findByEmailSuccess = true;
+      } catch (findErr: unknown) {
+        operationsResult.findByEmailSuccess = false;
+        operationsResult.findByEmailError = findErr instanceof Error ? findErr.message : String(findErr);
+      }
+
+      // Operations test: dry-run INSERT in transaction with rollback
+      if (schemaResult.usersTableExists) {
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const probeId = `probe_${Date.now()}`;
+          const probeEmail = `probe_${Date.now()}@diagnostic.test`;
+          const testRes = await client.query(
+            `INSERT INTO users (id, name, email, password_hash, role, status, created_at, last_login)
+             VALUES ($1, $2, $3, $4, 'user', 'ACTIVE', NOW(), NOW()) RETURNING id`,
+            [probeId, 'Diagnostic Probe', probeEmail, 'test_hash']
+          );
+          operationsResult.dryRunInsertSuccess = Boolean(testRes.rows[0]?.id);
+          await client.query('ROLLBACK');
+        } catch (insErr: unknown) {
+          await client.query('ROLLBACK').catch(() => {});
+          const err = insErr as { code?: string; message?: string };
+          operationsResult.dryRunInsertSuccess = false;
+          operationsResult.dryRunInsertError = `${err.code || 'ERROR'}: ${err.message || 'Insert failed'}`;
+        } finally {
+          client.release();
+        }
+      } else {
         operationsResult.dryRunInsertSuccess = false;
-        operationsResult.dryRunInsertError = `${err.code || 'ERROR'}: ${err.message || 'Insert failed'}`;
-      } finally {
-        client.release();
+        operationsResult.dryRunInsertError = 'Skipped: users table does not exist';
       }
     }
   } else if (!connectivityResult.errorMessage) {
@@ -220,9 +259,31 @@ export async function GET() {
   const overallHealth =
     connectivityResult.success &&
     schemaResult.usersTableExists &&
+    schemaResult.missingColumns.length === 0 &&
     operationsResult.findByEmailSuccess &&
     operationsResult.dryRunInsertSuccess &&
     operationsResult.bcryptHashSuccess;
+
+  let recommendation = 'All database and auth subsystems operational.';
+  if (!dbSafeInfo.configured) {
+    recommendation = 'Configure DATABASE_URL with a cloud PostgreSQL connection string in Vercel Project Settings.';
+  } else if (dbSafeInfo.isLocalhost && isProduction) {
+    recommendation = 'DATABASE_URL in Vercel points to 127.0.0.1/localhost. Update DATABASE_URL in Vercel to a cloud PostgreSQL database.';
+  } else if (!connectivityResult.success) {
+    recommendation = `Database connection failed (${connectivityResult.errorCode || 'UNKNOWN'}: ${connectivityResult.errorMessage || 'Failed to connect'}). Check database credentials and network access.`;
+  } else if (initDbResult.attempted && !initDbResult.success) {
+    recommendation = `Database schema migration failed (${initDbResult.errorCode || 'INIT_ERROR'}: ${initDbResult.errorMessage}). Check user DDL permissions.`;
+  } else if (!schemaResult.usersTableExists) {
+    recommendation = 'Users table does not exist. Check PostgreSQL user permissions to execute CREATE TABLE.';
+  } else if (schemaResult.missingColumns.length > 0) {
+    recommendation = `Users table missing columns: ${schemaResult.missingColumns.join(', ')}. Schema migration required.`;
+  } else if (!operationsResult.findByEmailSuccess) {
+    recommendation = `SELECT probe failed: ${operationsResult.findByEmailError}. Check table read permissions.`;
+  } else if (!operationsResult.dryRunInsertSuccess) {
+    recommendation = `INSERT failed: ${operationsResult.dryRunInsertError}. Check user table permissions and constraints.`;
+  } else if (!operationsResult.bcryptHashSuccess) {
+    recommendation = 'bcrypt hashing failed. Check bcryptjs runtime compatibility.';
+  }
 
   return NextResponse.json(
     {
@@ -231,19 +292,10 @@ export async function GET() {
       environment: envAudit,
       databaseUrlSafeInfo: dbSafeInfo,
       connectivity: connectivityResult,
+      initialization: initDbResult,
       schema: schemaResult,
       operations: operationsResult,
-      recommendation: !dbSafeInfo.configured
-        ? 'Configure DATABASE_URL with a cloud PostgreSQL connection string in Vercel Project Settings.'
-        : dbSafeInfo.isLocalhost
-        ? 'DATABASE_URL in Vercel points to 127.0.0.1/localhost. Update DATABASE_URL in Vercel to a cloud PostgreSQL database.'
-        : !connectivityResult.success
-        ? `Database connection failed (${connectivityResult.errorCode}). Check database credentials and network access.`
-        : schemaResult.missingColumns.length > 0
-        ? `Users table missing columns: ${schemaResult.missingColumns.join(', ')}. Schema migration required.`
-        : !operationsResult.dryRunInsertSuccess
-        ? `INSERT failed: ${operationsResult.dryRunInsertError}. Check user table permissions.`
-        : 'All database and auth subsystems operational.',
+      recommendation,
     },
     { status: overallHealth ? 200 : 503 }
   );
