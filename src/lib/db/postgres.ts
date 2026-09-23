@@ -29,12 +29,17 @@ export function getPool(): Pool | null {
 
   if (!pool) {
     const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+    const sslModeDisable = dbUrl.includes('sslmode=disable');
     pool = new Pool({
       connectionString: dbUrl,
-      ssl: isLocalhost ? false : { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      ssl: isLocalhost || sslModeDisable ? false : { rejectUnauthorized: false },
+      max: 3,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 15000,
+    });
+
+    pool.on('error', (err) => {
+      console.error('[PostgreSQL Pool] Idle client error:', err instanceof Error ? err.message : 'Unknown');
     });
   }
   return pool;
@@ -61,6 +66,23 @@ export async function initDatabase(): Promise<void> {
   const dbPool = getPool();
   if (dbPool) {
     try {
+      // Fast probe: check if users table already exists (single round-trip, no heavy DDL lock on cold start)
+      const probe = await dbPool.query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') AS exists"
+      );
+
+      const usersExist = Boolean(probe.rows[0]?.exists);
+
+      if (usersExist) {
+        isInitialized = true;
+        // Lazy-trigger secure Super Admin bootstrap if configured in environment
+        import('../auth/bootstrap')
+          .then((mod) => mod.bootstrapSuperAdminAccount())
+          .catch((err) => console.warn('[Security Bootstrap] Background trigger notice:', err?.message || err));
+        return;
+      }
+
+      // Initial migration: Execute single statements individually for PgBouncer / pooler compatibility
       // 1. Create users table if not exists with UNIQUE email
       await dbPool.query(`
         CREATE TABLE IF NOT EXISTS users (
@@ -75,58 +97,71 @@ export async function initDatabase(): Promise<void> {
           location_updated_at TIMESTAMP WITH TIME ZONE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           last_login TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
+        )
       `);
 
-      // 2. Ensure supplementary columns exist on users
-      await dbPool.query(`
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS location_name VARCHAR(255);
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE;
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE';
-      `);
+      // 2. Ensure supplementary columns exist on users (each statement executed separately)
+      const supplementaryColumns = [
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION',
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION',
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS location_name VARCHAR(255)',
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE',
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'",
+      ];
+      for (const alterSql of supplementaryColumns) {
+        try {
+          await dbPool.query(alterSql);
+        } catch {
+          // Column may already exist
+        }
+      }
 
-      // 3. User performance indices
-      await dbPool.query(`
-        CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
-        CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
-      `);
+      // 3. User performance indices (each statement executed separately)
+      try {
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email))');
+      } catch {}
+      try {
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_users_role ON users (role)');
+      } catch {}
 
-      // 4. Provision nationwide locations catalog
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS locations (
-          id VARCHAR(64) PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          normalized_name VARCHAR(255) NOT NULL,
-          state VARCHAR(150) NOT NULL,
-          state_code VARCHAR(10),
-          district VARCHAR(150) NOT NULL,
-          district_code VARCHAR(20),
-          locality_type VARCHAR(50) NOT NULL DEFAULT 'City',
-          latitude DOUBLE PRECISION NOT NULL,
-          longitude DOUBLE PRECISION NOT NULL,
-          country VARCHAR(10) DEFAULT 'IN',
-          population BIGINT,
-          elevation INTEGER,
-          aliases TEXT,
-          is_active BOOLEAN DEFAULT TRUE,
-          source VARCHAR(100) DEFAULT 'GeoNames-IN-CC-BY-4.0',
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT uq_locations_name_state_district UNIQUE (normalized_name, state, district)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_locations_normalized_name ON locations (normalized_name);
-        CREATE INDEX IF NOT EXISTS idx_locations_state ON locations (state);
-        CREATE INDEX IF NOT EXISTS idx_locations_district ON locations (district);
-        CREATE INDEX IF NOT EXISTS idx_locations_locality_type ON locations (locality_type);
-        CREATE INDEX IF NOT EXISTS idx_locations_coords ON locations (latitude, longitude);
-      `);
+      // 4. Provision nationwide locations catalog (single-statement execution)
+      try {
+        await dbPool.query(`
+          CREATE TABLE IF NOT EXISTS locations (
+            id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            normalized_name VARCHAR(255) NOT NULL,
+            state VARCHAR(150) NOT NULL,
+            state_code VARCHAR(10),
+            district VARCHAR(150) NOT NULL,
+            district_code VARCHAR(20),
+            locality_type VARCHAR(50) NOT NULL DEFAULT 'City',
+            latitude DOUBLE PRECISION NOT NULL,
+            longitude DOUBLE PRECISION NOT NULL,
+            country VARCHAR(10) DEFAULT 'IN',
+            population BIGINT,
+            elevation INTEGER,
+            aliases TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            source VARCHAR(100) DEFAULT 'GeoNames-IN-CC-BY-4.0',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_locations_name_state_district UNIQUE (normalized_name, state, district)
+          )
+        `);
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_normalized_name ON locations (normalized_name)');
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_state ON locations (state)');
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_district ON locations (district)');
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_locality_type ON locations (locality_type)');
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_locations_coords ON locations (latitude, longitude)');
+      } catch (locErr) {
+        console.warn('[PostgreSQL] Locations table init notice:', locErr instanceof Error ? locErr.message : 'Unknown');
+      }
 
       // 5. Provision immutable administrative & security audit trail table
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS audit_logs (
+      try {
+        await dbPool.query(`
+          CREATE TABLE IF NOT EXISTS audit_logs (
             id VARCHAR(64) PRIMARY KEY,
             timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             actor_id VARCHAR(64),
@@ -137,28 +172,42 @@ export async function initDatabase(): Promise<void> {
             resource_id VARCHAR(255),
             result VARCHAR(50) DEFAULT 'SUCCESS',
             details JSONB
-          );
-
-          CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
-          CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
+          )
         `);
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC)');
+        await dbPool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action)');
+      } catch (audErr) {
+        console.warn('[PostgreSQL] Audit log table init notice:', audErr instanceof Error ? audErr.message : 'Unknown');
+      }
 
-        isInitialized = true;
-        console.log('[PostgreSQL] Database schema validated and active.');
+      isInitialized = true;
+      console.log('[PostgreSQL] Database schema validated and active.');
 
-        // Lazy-trigger secure Super Admin bootstrap if configured in environment
-        import('../auth/bootstrap')
-          .then((mod) => mod.bootstrapSuperAdminAccount())
-          .catch((err) => console.warn('[Security Bootstrap] Background trigger notice:', err?.message || err));
+      // Lazy-trigger secure Super Admin bootstrap if configured in environment
+      import('../auth/bootstrap')
+        .then((mod) => mod.bootstrapSuperAdminAccount())
+        .catch((err) => console.warn('[Security Bootstrap] Background trigger notice:', err?.message || err));
 
-        return;
-      } catch (err) {
-        console.error('[PostgreSQL] Database initialization error:', err instanceof Error ? err.message : 'Unknown');
-        if (isProduction) {
-          throw new Error('Failed to initialize PostgreSQL database in production environment.');
+      return;
+    } catch (err) {
+      console.error('[PostgreSQL] Database initialization notice:', err instanceof Error ? err.message : 'Unknown');
+      // If users table is accessible, do not crash production
+      try {
+        const checkAfter = await dbPool.query(
+          "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') AS exists"
+        );
+        if (checkAfter.rows[0]?.exists) {
+          isInitialized = true;
+          return;
         }
+      } catch {
+        // Fall through to error
+      }
+      if (isProduction) {
+        throw new Error('Failed to initialize PostgreSQL database in production environment.');
       }
     }
+  }
 
   isInitialized = true;
 }

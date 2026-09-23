@@ -54,7 +54,22 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (err: unknown) {
-    console.error('Registration API error:', err instanceof Error ? err.message : 'Unknown');
+    const errorCode = (err as Record<string, unknown>)?.code;
+    const errorMessage = err instanceof Error ? err.message : 'Unknown';
+
+    // Handle database unique constraint violation (concurrent registration race condition)
+    if (errorCode === '23505') {
+      return NextResponse.json(
+        { error: 'An account with this email address already exists. Please log in.' },
+        { status: 409 }
+      );
+    }
+
+    console.error('Registration API error:', {
+      code: errorCode,
+      message: errorMessage,
+    });
+
     return NextResponse.json(
       { error: 'An unexpected error occurred while processing your registration. Please try again.' },
       { status: 500 }
