@@ -1,6 +1,9 @@
 import React from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const GlobeFallback: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
       {/* Outer ambient glow */}
@@ -17,7 +20,7 @@ export const GlobeFallback: React.FC = () => {
 
         {/* Orbit Ring */}
         <div className="absolute inset-[-18px] rounded-full border border-dashed border-sky-400/30 animate-[spin_25s_linear_infinite]" />
-        
+
         {/* Core highlight */}
         <div className="w-16 h-16 rounded-full bg-sky-400/10 blur-md" />
       </div>
@@ -25,7 +28,7 @@ export const GlobeFallback: React.FC = () => {
       <div className="absolute bottom-4 text-center">
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-navy-900/80 border border-slate-800 text-slate-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Atmospheric System Simulation (Active)
+          {t('visualControls.fallbackNotice', 'Atmospheric System Simulation (Active)')}
         </span>
       </div>
     </div>

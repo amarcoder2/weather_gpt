@@ -4,18 +4,17 @@ import React from 'react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { SIH_METADATA } from '../config/constants';
+import { useLanguage } from '../context/LanguageContext';
 import {
   ShieldCheck,
   Building2,
-  Cpu,
-  Database,
-  Layers,
-  Sparkles,
-  Award,
-  ArrowRight,
+  AlertCircle,
+  FileCheck,
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-5xl mx-auto">
       {/* Hero / Hackathon Header */}
@@ -27,7 +26,7 @@ export const AboutPage: React.FC = () => {
         </div>
 
         <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-          {SIH_METADATA.problemStatementTitle}
+          {t('about.title', SIH_METADATA.problemStatementTitle)}
         </h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs text-slate-300">
@@ -45,11 +44,14 @@ export const AboutPage: React.FC = () => {
       {/* Vision & Problem Statement */}
       <section className="space-y-4">
         <h2 className="text-xl font-bold text-white tracking-tight">
-          1. Project Vision & Core Challenge
+          {t('about.missionTitle', '1. Project Vision & Core Challenge')}
         </h2>
         <Card variant="glass" className="p-6 space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
           <p>
-            Weather information in India has historically remained confined to technical scientific websites with complex isobar charts, satellite matrices, and jargon-heavy PDF bulletins. When extreme climate events strike (e.g. Cyclone Amphan, Kerala floods, or severe summer heatwaves), ordinary citizens, local fishermen, and marginal farmers struggle to deduce concrete actions.
+            {t(
+              'about.missionDesc',
+              'Weather information in India has historically remained confined to technical scientific websites with complex isobar charts, satellite matrices, and jargon-heavy PDF bulletins. When extreme climate events strike (e.g. Cyclone Amphan, Kerala floods, or severe summer heatwaves), ordinary citizens, local fishermen, and marginal farmers struggle to deduce concrete actions.'
+            )}
           </p>
           <p>
             <strong>WeatherGPT</strong> is engineered not as another generic weather website, but as an <em>intelligent meteorological command center and conversational advisory platform</em>. It bridges complex meteorological datasets with natural-language reasoning to empower decision-makers, emergency rescue battalions, and grassroot citizens.
@@ -60,7 +62,7 @@ export const AboutPage: React.FC = () => {
       {/* Two-Phase Architectural Roadmap */}
       <section className="space-y-4">
         <h2 className="text-xl font-bold text-white tracking-tight">
-          2. Platform Architectural Phasing
+          {t('about.capabilitiesTitle', '2. Platform Architectural Phasing')}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -99,8 +101,8 @@ export const AboutPage: React.FC = () => {
 
             <h3 className="text-base font-bold text-white">Live Services & Cloud Infrastructure</h3>
             <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside">
-              <li><strong>Google Gemini LLM:</strong> Server-side streaming endpoint for deep meteorological queries.</li>
-              <li><strong>Live IMD API Ingest:</strong> Doppler radar telemetry and AWS network data pipelines.</li>
+              <li><strong>Google Gemini LLM (Integration Roadmap):</strong> Planned server-side streaming integration for deep meteorological synthesis.</li>
+              <li><strong>Direct IMD AWS Ingest (Integration Roadmap):</strong> Direct Doppler radar and AWS telemetry ingestion once programmatic API access is provisioned.</li>
               <li><strong>Firebase Authentication & Firestore:</strong> Secure citizen profiles and alert subscription records.</li>
               <li><strong>Cloudinary:</strong> Automated satellite imagery and radar GIF processing storage.</li>
               <li><strong>Web Speech API:</strong> Native real-time multilingual voice input & audio response synthesis.</li>
@@ -112,7 +114,7 @@ export const AboutPage: React.FC = () => {
       {/* Data Flow Pipeline */}
       <section className="space-y-4">
         <h2 className="text-xl font-bold text-white tracking-tight">
-          3. Intelligence Pipeline
+          {t('about.sourcesTitle', '3. Intelligence Pipeline')}
         </h2>
         <Card variant="glass" className="p-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
@@ -133,6 +135,20 @@ export const AboutPage: React.FC = () => {
           </div>
         </Card>
       </section>
+
+      {/* Statutory Disclaimer */}
+      <Card variant="glass" className="p-5 border-amber-500/20 bg-amber-500/5 space-y-2">
+        <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+          <AlertCircle className="w-4 h-4" />
+          <span>{t('about.disclaimerTitle', 'National Meteorological Advisory Disclaimer')}</span>
+        </div>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          {t(
+            'about.disclaimerText',
+            'WeatherGPT is a demonstration system engineered for Smart India Hackathon 2026. Official statutory advisories remain under the authority of IMD.'
+          )}
+        </p>
+      </Card>
     </div>
   );
 };

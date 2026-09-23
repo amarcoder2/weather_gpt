@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useWeather } from '../context/WeatherContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { CurrentWeatherHero } from '../components/weather/CurrentWeatherHero';
 import { AtmosphericMetricCard } from '../components/weather/AtmosphericMetricCard';
 import { AirQualityIndexCard } from '../components/weather/AirQualityIndexCard';
@@ -33,6 +34,7 @@ import { Button } from '../components/ui/Button';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const {
     weather,
     forecast,
@@ -80,9 +82,9 @@ export const DashboardPage: React.FC = () => {
     return (
       <div className="p-8 max-w-lg mx-auto">
         <EmptyState
-          title="Telemetry Connection Issue"
-          description="Unable to reach the automated weather observation station. Please verify your connection or retry."
-          actionText="Retry Telemetry Ingest"
+          title={t('dashboard.connectionIssue', 'Telemetry Connection Issue')}
+          description={t('dashboard.connectionIssueDesc', 'Unable to reach the automated weather observation station. Please verify your connection or retry.')}
+          actionText={t('dashboard.retryTelemetry', 'Retry Telemetry Ingest')}
           onAction={refreshData}
         />
       </div>
@@ -108,14 +110,14 @@ export const DashboardPage: React.FC = () => {
                 {locationPermissionError}
               </p>
               <p className="text-[11px] text-amber-200/80 mt-0.5">
-                Location access was not granted. You can select an observatory or city manually below.
+                {t('dashboard.locationDeniedDesc', 'Location access was not granted. You can select an observatory or city manually below.')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link href="/locations">
               <button className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold transition-colors">
-                Select City Manually
+                {t('dashboard.selectCityManually', 'Select City Manually')}
               </button>
             </Link>
             <button
@@ -134,28 +136,34 @@ export const DashboardPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30">
-              Live Weather Station
+              {t('dashboard.liveStation', 'Live Weather Station')}
             </span>
             {isUsingCurrentLocation ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                 <Navigation className="w-3 h-3 text-emerald-400 animate-pulse" />
-                Current Location (GPS Live)
+                {t('dashboard.currentLocation', 'Current Location (GPS Live)')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30">
                 <Compass className="w-3 h-3 text-sky-400" />
-                Selected Observatory
+                {t('dashboard.selectedObservatory', 'Selected Observatory')}
               </span>
             )}
           </div>
 
           <h1 className="text-xl sm:text-2xl font-extrabold text-white mt-1.5 tracking-tight font-sans">
-            Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400">{user?.name || 'Citizen Meteorologist'}</span>
+            {t('dashboard.welcome', 'Welcome')},{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400">
+              {user?.name || t('dashboard.citizenMeteorologist', 'Citizen Meteorologist')}
+            </span>
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-300 mt-1 flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-sky-400 shrink-0" />
-            <span>Currently viewing telemetry for <strong className="text-white font-bold">{weather.locationName}</strong>, {weather.district} ({weather.state})</span>
+            <span>
+              {t('dashboard.viewingTelemetry', 'Currently viewing telemetry for')}{' '}
+              <strong className="text-white font-bold">{weather.locationName}</strong>, {weather.district} ({weather.state})
+            </span>
           </p>
         </div>
 
@@ -169,7 +177,7 @@ export const DashboardPage: React.FC = () => {
             className="shadow-sm"
             icon={<MapPin className={`w-4 h-4 text-emerald-400 ${locationLoading ? 'animate-bounce' : ''}`} />}
           >
-            {locationLoading ? 'Acquiring GPS...' : '📍 Use My Current Location'}
+            {locationLoading ? t('header.acquiringGPS', 'Acquiring GPS...') : `📍 ${t('header.useCurrentLocation', 'Use My Current Location')}`}
           </Button>
 
           <Link href="/locations">
@@ -178,7 +186,7 @@ export const DashboardPage: React.FC = () => {
               size="sm"
               icon={<Search className="w-4 h-4 text-sky-400" />}
             >
-              🔎 Search Location
+              {`🔎 ${t('common.searchLocation', 'Search Location')}`}
             </Button>
           </Link>
         </div>
@@ -194,65 +202,65 @@ export const DashboardPage: React.FC = () => {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-            Atmospheric Sensors & In-Situ Observations
+            {t('dashboard.atmosphericSensors', 'Atmospheric Sensors & In-Situ Observations')}
           </h3>
           <button
             onClick={refreshData}
             className="text-xs text-slate-400 hover:text-sky-400 flex items-center gap-1 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh Telemetry</span>
+            <span>{t('dashboard.refreshTelemetry', 'Refresh Telemetry')}</span>
           </button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           <AtmosphericMetricCard
-            title="Relative Humidity"
+            title={t('weather.relativeHumidity', 'Relative Humidity')}
             value={weather.humidity}
             unit="%"
             icon={<Droplets className="w-4 h-4 text-sky-400" />}
-            subtitle={`Dew pt: ${weather.dewPoint}°C`}
-            statusBadge={{ text: weather.humidity > 75 ? 'Elevated' : 'Normal', color: 'sky' }}
+            subtitle={`${t('weather.dewPoint', 'Dew pt')}: ${weather.dewPoint}°C`}
+            statusBadge={{ text: weather.humidity > 75 ? t('weather.elevated', 'Elevated') : t('weather.normal', 'Normal'), color: 'sky' }}
           />
           <AtmosphericMetricCard
-            title="Wind & Gusts"
+            title={t('weather.windGust', 'Wind & Gusts')}
             value={weather.windSpeed}
             unit="km/h"
             icon={<Wind className="w-4 h-4 text-indigo-400" />}
-            subtitle={`Gusts to ${weather.windGust} km/h (${weather.windDirection})`}
-            statusBadge={{ text: 'Active', color: 'purple' }}
+            subtitle={`${t('weather.windGust', 'Gusts')} ${weather.windGust} km/h (${weather.windDirection})`}
+            statusBadge={{ text: t('common.active', 'Active'), color: 'purple' }}
           />
           <AtmosphericMetricCard
-            title="Barometric Pressure"
+            title={t('weather.atmosphericPressure', 'Barometric Pressure')}
             value={weather.pressure}
             unit="hPa"
             icon={<Compass className="w-4 h-4 text-emerald-400" />}
-            subtitle="Sea-level normalized"
-            statusBadge={{ text: 'Falling', color: 'amber' }}
+            subtitle={t('weather.seaLevelNormalized', 'Sea-level normalized')}
+            statusBadge={{ text: t('weather.falling', 'Falling'), color: 'amber' }}
           />
           <AtmosphericMetricCard
-            title="UV Radiation"
+            title={t('weather.uvIndex', 'UV Radiation')}
             value={weather.uvIndex}
             unit="/ 11"
             icon={<Sun className="w-4 h-4 text-amber-400" />}
-            subtitle="Peak at solar noon"
-            statusBadge={{ text: weather.uvIndex >= 7 ? 'High' : 'Moderate', color: 'amber' }}
+            subtitle={t('weather.solarNoonPeak', 'Peak at solar noon')}
+            statusBadge={{ text: weather.uvIndex >= 7 ? t('weather.high', 'High') : t('weather.moderate', 'Moderate'), color: 'amber' }}
           />
           <AtmosphericMetricCard
-            title="Optical Visibility"
+            title={t('weather.visibility', 'Optical Visibility')}
             value={weather.visibility}
             unit="km"
             icon={<Eye className="w-4 h-4 text-sky-300" />}
-            subtitle="Haze & rain attenuation"
-            statusBadge={{ text: 'Adequate', color: 'emerald' }}
+            subtitle={t('weather.hazeAttenuation', 'Haze & rain attenuation')}
+            statusBadge={{ text: t('weather.adequate', 'Adequate'), color: 'emerald' }}
           />
           <AtmosphericMetricCard
-            title="Cloud Fraction"
+            title={t('weather.cloudCover', 'Cloud Fraction')}
             value={weather.cloudCover}
             unit="%"
             icon={<Cloud className="w-4 h-4 text-slate-400" />}
-            subtitle="Cumulonimbus bands"
-            statusBadge={{ text: weather.cloudCover > 60 ? 'Overcast' : 'Scattered', color: 'sky' }}
+            subtitle={t('weather.cumulonimbusBands', 'Cumulonimbus bands')}
+            statusBadge={{ text: weather.cloudCover > 60 ? t('weather.overcast', 'Overcast') : t('weather.scattered', 'Scattered'), color: 'sky' }}
           />
         </div>
       </div>
@@ -282,14 +290,14 @@ export const DashboardPage: React.FC = () => {
           <div className="p-5 rounded-2xl bg-gradient-to-br from-navy-900 to-indigo-950/60 border border-indigo-500/30 shadow-xl space-y-3">
             <div className="flex items-center gap-2 text-sky-400">
               <Bot className="w-5 h-5" />
-              <h4 className="text-sm font-bold text-white">Ask WeatherGPT about this area</h4>
+              <h4 className="text-sm font-bold text-white">{t('chat.askWeatherGPTArea', 'Ask WeatherGPT about this area')}</h4>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
               Have specific questions about {weather.locationName}'s rainfall probability, waterlogging threats, or agricultural advisories?
             </p>
             <Link href="/chat" className="block pt-1">
               <Button variant="primary" size="sm" className="w-full" icon={<Bot className="w-4 h-4" />}>
-                Start Conversational Query
+                {t('chat.startQuery', 'Start Conversational Query')}
               </Button>
             </Link>
           </div>

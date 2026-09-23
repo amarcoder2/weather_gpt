@@ -119,25 +119,26 @@ async function seedDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP WITH TIME ZONE;
     `);
 
-    // 2. Seed Admin Account if ADMIN_PASSWORD or DEMO_ADMIN_PASSWORD is set
-    const adminPassword = process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD;
-    const adminEmail = (process.env.ADMIN_EMAIL || process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in').toLowerCase().trim();
+    // 2. Seed Super Admin Owner Account if ADMIN_BOOTSTRAP_PASSWORD or ADMIN_PASSWORD is set
+    const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD;
+    const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || process.env.ADMIN_EMAIL || process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in').toLowerCase().trim();
+    const bootstrapRole = process.env.ADMIN_BOOTSTRAP_EMAIL ? 'super_admin' : (process.env.ADMIN_PASSWORD ? 'admin' : 'admin');
 
-    if (adminPassword) {
-      if (adminPassword.length < 8) {
+    if (bootstrapPassword) {
+      if (bootstrapPassword.length < 8) {
         console.warn('[Warning] Admin password is shorter than 8 characters. Minimum 8 characters recommended.');
       }
-      const adminHash = await bcrypt.hash(adminPassword, 10);
+      const adminHash = await bcrypt.hash(bootstrapPassword, 12);
       await client.query(
-        `INSERT INTO users (id, name, email, password_hash, role, location_name, latitude, longitude, created_at, last_login)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+        `INSERT INTO users (id, name, email, password_hash, role, status, location_name, latitude, longitude, created_at, last_login)
+         VALUES ($1, $2, $3, $4, $5, 'ACTIVE', $6, $7, $8, NOW(), NOW())
          ON CONFLICT (email) 
-         DO UPDATE SET password_hash = EXCLUDED.password_hash, role = 'admin', last_login = NOW()`,
-        ['usr_admin_default', 'IMD Lead Scientist (Admin)', adminEmail, adminHash, 'admin', 'New Delhi, Delhi NCR', 28.6139, 77.2090]
+         DO UPDATE SET password_hash = EXCLUDED.password_hash, role = $5, status = 'ACTIVE', last_login = NOW()`,
+        ['usr_owner_default', process.env.ADMIN_BOOTSTRAP_NAME || 'WeatherGPT Owner (Super Admin)', bootstrapEmail, adminHash, bootstrapRole, 'New Delhi, Delhi NCR', 28.6139, 77.2090]
       );
-      console.log(`[Success] Seeded admin account: ${adminEmail} (Role: admin)`);
+      console.log(`[Success] Seeded administrator account: ${bootstrapEmail} (Role: ${bootstrapRole}, Status: ACTIVE)`);
     } else {
-      console.log(`[Skipped] Neither ADMIN_PASSWORD nor DEMO_ADMIN_PASSWORD set. Admin account was not modified.`);
+      console.log(`[Skipped] Neither ADMIN_BOOTSTRAP_PASSWORD nor ADMIN_PASSWORD set. Admin account was not modified.`);
     }
 
     // 3. Seed Demo User Account if DEMO_USER_PASSWORD is set

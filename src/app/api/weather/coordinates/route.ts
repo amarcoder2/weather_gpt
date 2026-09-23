@@ -83,16 +83,29 @@ export async function GET(req: NextRequest) {
 
       if (wResp.ok) {
         weatherRes = await wResp.json();
+      } else {
+        console.warn(`[Weather Telemetry] Open-Meteo responded with HTTP ${wResp.status}`);
       }
       if (aResp && aResp.ok) {
         aqiRes = await aResp.json();
       }
     } catch (err) {
-      console.warn('Open-Meteo API fetch warning:', err);
+      console.warn('[Weather Telemetry] Upstream weather fetch failed or timed out:', err instanceof Error ? err.message : 'Unknown error');
     }
 
-    // 2. Format WeatherData
-    const cur = weatherRes?.current;
+    // If live Open-Meteo telemetry is unavailable, reject with 503 rather than fabricating fake FRESH data
+    if (!weatherRes || !weatherRes.current) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Live meteorological telemetry is temporarily unavailable from upstream provider. Please try again shortly.',
+        },
+        { status: 503 }
+      );
+    }
+
+    // 2. Format WeatherData from verified live telemetry
+    const cur = weatherRes.current;
     const temp = cur ? Math.round(cur.temperature_2m * 10) / 10 : 29.5;
     const feelsLike = cur ? Math.round(cur.apparent_temperature * 10) / 10 : temp + 2.5;
     const humidity = cur ? Math.round(cur.relative_humidity_2m) : 74;

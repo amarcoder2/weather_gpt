@@ -2,22 +2,24 @@
 
 import React, { useState } from 'react';
 import { useWeather } from '../context/WeatherContext';
+import { useLanguage } from '../context/LanguageContext';
 import { HourlyForecastChart } from '../components/forecast/HourlyForecastChart';
 import { SevenDayForecastList } from '../components/forecast/SevenDayForecastList';
 import { Card } from '../components/ui/Card';
 import { Tabs } from '../components/ui/Tabs';
 import { Skeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
-import { CloudSun, Compass, Calendar, AlertCircle } from 'lucide-react';
+import { CloudSun, Compass, Calendar } from 'lucide-react';
 
 export const ForecastPage: React.FC = () => {
   const { weather, forecast, loading, error } = useWeather();
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<'both' | 'hourly' | 'daily'>('both');
 
   const tabs = [
-    { id: 'both', label: 'Complete Outlook (Hourly + 7-Day)' },
-    { id: 'hourly', label: '24-Hour Synoptic' },
-    { id: 'daily', label: '7-Day Synoptic' },
+    { id: 'both', label: t('forecast.completeOutlook', 'Complete Outlook (Hourly + 7-Day)') },
+    { id: 'hourly', label: t('forecast.synoptic24h', '24-Hour Synoptic') },
+    { id: 'daily', label: t('forecast.synoptic7d', '7-Day Synoptic') },
   ];
 
   if (loading) {
@@ -34,8 +36,8 @@ export const ForecastPage: React.FC = () => {
     return (
       <div className="p-8 max-w-md mx-auto">
         <EmptyState
-          title="Forecast Simulation Unavailable"
-          description="Could not load numerical prediction model feeds for this location."
+          title={t('forecast.unavailable', 'Forecast Simulation Unavailable')}
+          description={t('forecast.unavailableDesc', 'Could not load numerical prediction model feeds for this location.')}
         />
       </div>
     );
@@ -49,11 +51,11 @@ export const ForecastPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <CloudSun className="w-5 h-5 text-sky-400" />
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              Numerical Weather Prediction Outlook
+              {t('forecast.title', 'Numerical Weather Prediction Outlook')}
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Forecasting Station: <strong className="text-slate-200">{weather.locationName}</strong>, {weather.state} (IMD Multi-Model Ensemble)
+            {t('forecast.station', 'Forecasting Station')}: <strong className="text-slate-200">{weather.locationName}</strong>, {weather.state} (IMD Multi-Model Ensemble)
           </p>
         </div>
 
@@ -68,7 +70,7 @@ export const ForecastPage: React.FC = () => {
           </div>
           <div className="space-y-1">
             <h3 className="text-xs font-bold text-sky-300 uppercase tracking-wider">
-              Synoptic Meteorological Discussion
+              {t('forecast.discussion', 'Synoptic Meteorological Discussion')}
             </h3>
             <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
               {forecast.synopticOverview}
@@ -87,7 +89,7 @@ export const ForecastPage: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-sky-400" />
-            <h3 className="text-base font-bold text-white">7-Day Day-by-Day Forecast Breakdown</h3>
+            <h3 className="text-base font-bold text-white">{t('forecast.dailyBreakdown', '7-Day Day-by-Day Forecast Breakdown')}</h3>
           </div>
           <SevenDayForecastList dailyData={forecast.daily} />
         </div>

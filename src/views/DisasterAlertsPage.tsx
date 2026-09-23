@@ -8,9 +8,11 @@ import { AlertMapPreview } from '../components/alerts/AlertMapPreview';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Tabs } from '../components/ui/Tabs';
+import { useLanguage } from '../context/LanguageContext';
 import { AlertTriangle, Radio, Filter, Search } from 'lucide-react';
 
 export const DisasterAlertsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [alerts, setAlerts] = useState<WeatherAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<AlertCategory | 'All'>('All');
@@ -18,20 +20,20 @@ export const DisasterAlertsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const categoryTabs = [
-    { id: 'All', label: 'All Categories' },
-    { id: 'Cyclone', label: 'Cyclone' },
-    { id: 'Flood', label: 'Flood' },
-    { id: 'Heatwave', label: 'Heatwave' },
-    { id: 'Thunderstorm', label: 'Thunderstorm' },
-    { id: 'Coastal Surge', label: 'Coastal Swell' },
+    { id: 'All', label: t('alerts.allCategories') },
+    { id: 'Cyclone', label: t('alerts.cyclone') },
+    { id: 'Flood', label: t('alerts.flood') },
+    { id: 'Heatwave', label: t('alerts.heatwave') },
+    { id: 'Thunderstorm', label: t('alerts.thunderstorm') },
+    { id: 'Coastal Surge', label: t('alerts.coastalSwell') },
   ];
 
   const severityTabs = [
-    { id: 'All', label: 'All Severities' },
-    { id: 'Critical', label: 'Critical (Red)' },
-    { id: 'Warning', label: 'Warning (Orange)' },
-    { id: 'Watch', label: 'Watch (Yellow)' },
-    { id: 'Information', label: 'Information' },
+    { id: 'All', label: t('alerts.allSeverities') },
+    { id: 'Critical', label: t('alerts.critical') },
+    { id: 'Warning', label: t('alerts.warning') },
+    { id: 'Watch', label: t('alerts.watch') },
+    { id: 'Information', label: t('alerts.info') },
   ];
 
   const loadAlerts = async () => {
@@ -60,10 +62,10 @@ export const DisasterAlertsPage: React.FC = () => {
             </span>
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">
-                Disaster & Early Warning Command Center
+                {t('alerts.pageTitle')}
               </h1>
               <p className="text-xs text-slate-400">
-                Official severe meteorological alerts broadcasted by India Meteorological Department (IMD)
+                {t('alerts.pageSubtitle')}
               </p>
             </div>
           </div>
@@ -71,7 +73,7 @@ export const DisasterAlertsPage: React.FC = () => {
 
         <div className="flex items-center gap-2 bg-navy-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs font-mono text-emerald-400">
           <Radio className="w-3.5 h-3.5 animate-pulse" />
-          <span>IMD Broadcast Frequency: Live</span>
+          <span>{t('alerts.broadcastFrequency')}</span>
         </div>
       </div>
 
@@ -87,7 +89,7 @@ export const DisasterAlertsPage: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
             <Filter className="w-3.5 h-3.5 text-sky-400" />
-            <span>Filter Active Bulletins:</span>
+            <span>{t('alerts.filterActive')}</span>
           </div>
 
           <div className="relative flex-1 max-w-xs">
@@ -96,7 +98,7 @@ export const DisasterAlertsPage: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Filter by district, state, or hazard..."
+              placeholder={t('alerts.filterPlaceholder')}
               className="w-full h-8 pl-8 pr-3 bg-navy-950 border border-slate-700/80 rounded-lg text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-500"
             />
           </div>
@@ -124,9 +126,9 @@ export const DisasterAlertsPage: React.FC = () => {
         </div>
       ) : alerts.length === 0 ? (
         <EmptyState
-          title="No Active Bulletins Matching Filter"
-          description="There are currently no active warnings in this specific category or region."
-          actionText="Reset Filters"
+          title={t('alerts.noMatchingBulletins')}
+          description={t('alerts.noMatchingBulletinsDesc')}
+          actionText={t('alerts.resetFilters')}
           onAction={() => {
             setSelectedCategory('All');
             setSelectedSeverity('All');

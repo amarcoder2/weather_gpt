@@ -29,26 +29,26 @@ import { useAuth } from '../../context/AuthContext';
 export const MobileNav: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const { t } = useLanguage();
-  const { role, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
 
   const primaryItems = isAuthenticated
     ? [
-        { to: '/', label: 'Home', icon: Home, exact: true },
-        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { to: '/chat', label: 'Ask AI', icon: Bot, isHighlight: true },
-        { to: '/alerts', label: 'Alerts', icon: AlertTriangle, hasDot: true },
+        { to: '/', label: t('nav.home', 'Home'), icon: Home, exact: true },
+        { to: '/dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard },
+        { to: '/chat', label: t('nav.chat', 'Ask AI'), icon: Bot, isHighlight: true },
+        { to: '/alerts', label: t('nav.alerts', 'Alerts'), icon: AlertTriangle, hasDot: true },
       ]
     : [
-        { to: '/', label: 'Home', icon: Home, exact: true },
-        { to: '/login', label: 'Sign In', icon: LogIn },
-        { to: '/register', label: 'Register', icon: UserPlus, isHighlight: true },
-        { to: '/about', label: 'About', icon: Info },
+        { to: '/', label: t('nav.home', 'Home'), icon: Home, exact: true },
+        { to: '/login', label: t('common.signIn', 'Sign In'), icon: LogIn },
+        { to: '/register', label: t('common.createAccount', 'Register'), icon: UserPlus, isHighlight: true },
+        { to: '/about', label: t('nav.about', 'About'), icon: Info },
       ];
 
   const secondaryItems = isAuthenticated
     ? [
-        { to: '/admin', label: 'Admin Console', icon: ShieldAlert },
+        { to: '/admin', label: t('nav.admin', 'Admin Console'), icon: ShieldAlert },
         { to: '/forecast', label: t('nav.forecast', 'Forecast'), icon: CloudSun },
         { to: '/risk', label: t('nav.risk', 'Risk Intelligence'), icon: ShieldCheck },
         { to: '/explorer', label: t('nav.explorer', 'Weather Explorer'), icon: Compass },
@@ -59,9 +59,9 @@ export const MobileNav: React.FC = () => {
         { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
       ]
     : [
-        { to: '/admin', label: 'Admin Console', icon: ShieldAlert },
-        { to: '/login', label: 'Sign In', icon: LogIn },
-        { to: '/register', label: 'Create Account', icon: UserPlus },
+        { to: '/admin', label: t('nav.admin', 'Admin Console'), icon: ShieldAlert },
+        { to: '/login', label: t('common.signIn', 'Sign In'), icon: LogIn },
+        { to: '/register', label: t('common.createAccount', 'Create Account'), icon: UserPlus },
         { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
       ];
 
@@ -109,10 +109,10 @@ export const MobileNav: React.FC = () => {
         <button
           onClick={() => setIsDrawerOpen(true)}
           className="flex flex-col items-center justify-center w-14 h-full text-[10px] font-medium text-slate-400 hover:text-slate-200"
-          aria-label="Open navigation menu"
+          aria-label={t('nav.openMenu', 'Open navigation menu')}
         >
           <Menu className="w-5 h-5 mb-0.5" />
-          <span>More</span>
+          <span>{t('common.more', 'More')}</span>
         </button>
       </nav>
 
@@ -133,7 +133,7 @@ export const MobileNav: React.FC = () => {
               <button
                 onClick={() => setIsDrawerOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white"
-                aria-label="Close menu"
+                aria-label={t('common.close', 'Close menu')}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -171,7 +171,7 @@ export const MobileNav: React.FC = () => {
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4 text-red-400" />
-                    <span>Sign Out</span>
+                    <span>{t('common.signOut', 'Sign Out')}</span>
                   </button>
                 </div>
               )}

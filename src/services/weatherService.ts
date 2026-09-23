@@ -1,72 +1,67 @@
 import { WeatherData } from '../types/weather';
-import { MOCK_WEATHER_RECORDS } from '../data/mockWeather';
+import { LocationInfo } from '../types/location';
+import { DEFAULT_LOCATIONS } from '../config/constants';
 import { apiClient } from './apiClient';
+import { locationService } from './locationService';
 
 export interface IWeatherService {
-  getCurrentWeather(locationId: string): Promise<WeatherData>;
+  getCurrentWeather(locationOrId: string | LocationInfo): Promise<WeatherData>;
   getAllStations(): Promise<WeatherData[]>;
 }
 
 class WeatherService implements IWeatherService {
-  async getCurrentWeather(locationId: string): Promise<WeatherData> {
-    const normalized = locationId.toLowerCase();
-    try {
-      const response = await apiClient.get<Record<string, unknown>>(`/weather/current?locationId=${encodeURIComponent(normalized)}`);
-      if (response.success && response.data) {
-        const obs = response.data;
-        const fallback = MOCK_WEATHER_RECORDS[normalized] || MOCK_WEATHER_RECORDS['kolkata'];
+  async getCurrentWeather(locationOrId: string | LocationInfo): Promise<WeatherData> {
+    let loc: LocationInfo | undefined;
 
-        return {
-          locationId: (obs.locationId as string) || normalized,
-          locationName: (obs.locationName as string) || fallback.locationName,
-          district: (obs.district as string) || fallback.district,
-          state: (obs.state as string) || fallback.state,
-          lat: Number(obs.latitude || fallback.lat),
-          lon: Number(obs.longitude || fallback.lon),
-          temperature: Number(obs.temperature !== undefined ? obs.temperature : fallback.temperature),
-          feelsLike: Number(obs.feelsLike !== undefined ? obs.feelsLike : fallback.feelsLike),
-          tempMin: Number(obs.tempMin !== undefined ? obs.tempMin : fallback.tempMin),
-          tempMax: Number(obs.tempMax !== undefined ? obs.tempMax : fallback.tempMax),
-          humidity: Number(obs.humidity !== undefined ? obs.humidity : fallback.humidity),
-          windSpeed: Number(obs.windSpeed !== undefined ? obs.windSpeed : fallback.windSpeed),
-          windDirection: (obs.windDirection as string) || fallback.windDirection,
-          windGust: Number(obs.windGust || fallback.windGust),
-          pressure: Number(obs.pressure || fallback.pressure),
-          visibility: Number(obs.visibility || fallback.visibility),
-          uvIndex: Number(obs.uvIndex || fallback.uvIndex),
-          precipitationProbability: Number(obs.precipitationProbability || fallback.precipitationProbability),
-          condition: (obs.condition as string) || fallback.condition,
-          conditionCode: (obs.conditionCode as WeatherData['conditionCode']) || fallback.conditionCode,
-          dewPoint: Number(obs.dewPoint || fallback.dewPoint),
-          cloudCover: Number(obs.cloudCover || fallback.cloudCover),
-          airQualityIndex: Number(obs.airQualityIndex || fallback.airQualityIndex),
-          airQualityCategory: (obs.airQualityCategory as WeatherData['airQualityCategory']) || fallback.airQualityCategory,
-          pm25: fallback.pm25,
-          pm10: fallback.pm10,
-          updatedTime: (obs.observedAt as string) || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          stationName: (obs.sourceStation as string) || (obs.source as string) || fallback.stationName,
-          dataFreshness: 'DEMO', // Clearly mark mock engine data
-          isDemo: true,
-        };
+    if (typeof locationOrId === 'object' && locationOrId !== null) {
+      loc = locationOrId;
+    } else {
+      const normalized = locationOrId.toLowerCase().trim();
+      loc = await locationService.getLocationById(normalized);
+      if (!loc) {
+        loc = DEFAULT_LOCATIONS.find((l) => l.id.toLowerCase() === normalized);
       }
-    } catch {
-      // Graceful fallback to bundled mock data
     }
 
-    const data = MOCK_WEATHER_RECORDS[normalized] || MOCK_WEATHER_RECORDS['kolkata'];
+    if (!loc) {
+      throw new Error(`Location "${typeof locationOrId === 'string' ? locationOrId : 'unknown'}" could not be resolved. Please search and select a valid location.`);
+    }
+
+    const params = new URLSearchParams({
+      latitude: loc.lat.toString(),
+      longitude: loc.lon.toString(),
+      city: loc.name,
+      district: loc.district,
+      state: loc.state,
+    });
+
+    const response = await apiClient.get<{ weather: WeatherData }>(`/weather/coordinates?${params.toString()}`);
+
+    if (!response.success || !response.data?.weather) {
+      throw new Error(response.error?.message || `Failed to fetch live weather data for ${loc.name}.`);
+    }
+
     return {
-      ...data,
-      dataFreshness: 'DEMO',
-      isDemo: true,
+      ...response.data.weather,
+      locationId: loc.id,
+      locationName: loc.name,
+      district: loc.district,
+      state: loc.state,
+      stationName: loc.stationCode
+        ? `${loc.name} Weather Observatory (${loc.stationCode})`
+        : response.data.weather.stationName,
+      dataFreshness: 'FRESH',
+      isDemo: false,
     };
   }
 
   async getAllStations(): Promise<WeatherData[]> {
-    return Object.values(MOCK_WEATHER_RECORDS).map((rec) => ({
-      ...rec,
-      dataFreshness: 'DEMO',
-      isDemo: true,
-    }));
+    const results = await Promise.allSettled(
+      DEFAULT_LOCATIONS.map((loc) => this.getCurrentWeather(loc.id))
+    );
+    return results
+      .filter((r): r is PromiseFulfilledResult<WeatherData> => r.status === 'fulfilled')
+      .map((r) => r.value);
   }
 }
 

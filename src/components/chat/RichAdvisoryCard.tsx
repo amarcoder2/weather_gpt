@@ -1,18 +1,21 @@
 import React from 'react';
 import { ChatAdvisoryData } from '../../types/chat';
 import { Card } from '../ui/Card';
+import { useLanguage } from '../../context/LanguageContext';
 import { CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export const RichAdvisoryCard: React.FC<{ advisory: ChatAdvisoryData }> = ({ advisory }) => {
+  const { t } = useLanguage();
+
   return (
     <Card variant="glass" className="p-4 my-2 border-amber-500/30 bg-navy-900/90 max-w-md">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5" />
-          {advisory.targetGroup} Advisory
+          {advisory.targetGroup} {t('chat.advisory')}
         </span>
         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
-          {advisory.priority} Priority
+          {advisory.priority} {t('chat.priority')}
         </span>
       </div>
 
@@ -26,7 +29,7 @@ export const RichAdvisoryCard: React.FC<{ advisory: ChatAdvisoryData }> = ({ adv
       </div>
 
       <p className="text-[11px] text-slate-400 mt-3 pt-2 border-t border-slate-800">
-        <strong>Optimal Window:</strong> {advisory.safeWindow}
+        <strong>{t('chat.optimalWindow')}</strong> {advisory.safeWindow}
       </p>
     </Card>
   );

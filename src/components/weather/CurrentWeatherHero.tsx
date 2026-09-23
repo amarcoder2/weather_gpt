@@ -1,6 +1,7 @@
 import React from 'react';
 import { WeatherData } from '../../types/weather';
 import { useWeather } from '../../context/WeatherContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   CloudRain,
   Sun,
@@ -14,7 +15,6 @@ import {
   Thermometer,
   Disc,
 } from 'lucide-react';
-import { Badge } from '../ui/Badge';
 
 interface CurrentWeatherHeroProps {
   weather: WeatherData;
@@ -22,6 +22,7 @@ interface CurrentWeatherHeroProps {
 
 export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather }) => {
   const { formatTemp, isUsingCurrentLocation } = useWeather();
+  const { t } = useLanguage();
 
   const getConditionIcon = (code: string) => {
     switch (code) {
@@ -94,25 +95,25 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
             {isUsingCurrentLocation ? (
               <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Current Location • GPS Live
+                {t('dashboard.currentLocation', 'Current Location • GPS Live')}
               </span>
             ) : (
               <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30 font-semibold flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-sky-400" />
-                Selected Location • IMD Observatory
+                {t('dashboard.selectedLocation', 'Selected Location • IMD Observatory')}
               </span>
             )}
           </div>
           <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5">
             <Radio className="w-3 h-3 text-emerald-400 shrink-0" />
-            <span>Telemetry Source: <strong className="text-slate-200">{weather.stationName}</strong> ({weather.district})</span>
+            <span>{t('dashboard.telemetrySource', 'Telemetry Source')}: <strong className="text-slate-200">{weather.stationName}</strong> ({weather.district})</span>
           </p>
         </div>
 
         {/* Data Freshness Tag */}
         <div className="flex items-center gap-2 bg-navy-950/80 px-3 py-1.5 rounded-full border border-slate-800 text-xs text-slate-400">
           <Clock className="w-3.5 h-3.5 text-sky-400" />
-          <span>Freshness: <span className="text-slate-200 font-medium">{weather.updatedTime}</span></span>
+          <span>{t('dashboard.freshness', 'Freshness')}: <span className="text-slate-200 font-medium">{weather.updatedTime}</span></span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
         </div>
       </div>
@@ -132,16 +133,16 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
               </span>
               <div className="space-y-0.5">
                 <span className="text-xs font-mono text-slate-400 block">
-                  Feels like: <strong className="text-slate-200">{formatTemp(weather.feelsLike)}</strong>
+                  {t('dashboard.feelsLike', 'Feels like')}: <strong className="text-slate-200">{formatTemp(weather.feelsLike)}</strong>
                 </span>
                 <span className="text-xs font-mono text-slate-400 block">
-                  H: <strong className="text-amber-300">{formatTemp(weather.tempMax)}</strong> · L: <strong className="text-sky-300">{formatTemp(weather.tempMin)}</strong>
+                  {t('dashboard.tempHigh', 'H')}: <strong className="text-amber-300">{formatTemp(weather.tempMax)}</strong> · {t('dashboard.tempLow', 'L')}: <strong className="text-sky-300">{formatTemp(weather.tempMin)}</strong>
                 </span>
               </div>
             </div>
 
             <p className="text-base md:text-lg font-bold text-sky-300 mt-2 flex items-center gap-2">
-              <span>{weather.condition}</span>
+              <span>{t('weather.condition.' + weather.conditionCode, weather.condition)}</span>
             </p>
             <p className="text-xs text-slate-300 mt-1 max-w-md leading-relaxed">
               Active observation indicates monsoonal convergence across Gangetic basin with Doppler radar reflectivity showing precipitation cells.
@@ -154,7 +155,7 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
           <div className="space-y-1">
             <span className="text-[11px] text-slate-400 flex items-center gap-1">
               <Droplets className="w-3.5 h-3.5 text-sky-400" />
-              Precip Probability
+              {t('weather.precipProbability', 'Precip Probability')}
             </span>
             <p className="text-xl font-extrabold text-sky-300 tabular-numbers">
               {weather.precipitationProbability}%
@@ -164,7 +165,7 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
           <div className="space-y-1">
             <span className="text-[11px] text-slate-400 flex items-center gap-1">
               <Wind className="w-3.5 h-3.5 text-indigo-400" />
-              Surface Wind
+              {t('weather.surfaceWind', 'Surface Wind')}
             </span>
             <p className="text-lg font-bold text-slate-200 tabular-numbers">
               {weather.windSpeed} <span className="text-xs font-normal text-slate-400">km/h ({weather.windDirection})</span>
@@ -174,7 +175,7 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
           <div className="space-y-1">
             <span className="text-[11px] text-slate-400 flex items-center gap-1">
               <Eye className="w-3.5 h-3.5 text-emerald-400" />
-              Optical Visibility
+              {t('weather.visibility', 'Optical Visibility')}
             </span>
             <p className="text-lg font-bold text-slate-200 tabular-numbers">
               {weather.visibility} <span className="text-xs font-normal text-slate-400">km</span>
@@ -184,10 +185,10 @@ export const CurrentWeatherHero: React.FC<CurrentWeatherHeroProps> = ({ weather 
           <div className="space-y-1">
             <span className="text-[11px] text-slate-400 flex items-center gap-1">
               <Sun className="w-3.5 h-3.5 text-amber-400" />
-              UV Index
+              {t('weather.uvIndex', 'UV Index')}
             </span>
             <p className="text-lg font-bold text-amber-300 tabular-numbers">
-              {weather.uvIndex} <span className="text-xs font-normal text-slate-400">/ 11 (High)</span>
+              {weather.uvIndex} <span className="text-xs font-normal text-slate-400">/ 11 ({weather.uvIndex >= 7 ? t('weather.high', 'High') : t('weather.moderate', 'Moderate')})</span>
             </p>
           </div>
         </div>

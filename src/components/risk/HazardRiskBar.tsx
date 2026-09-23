@@ -2,6 +2,7 @@ import React from 'react';
 import { HazardRisk } from '../../types/risk';
 import { Card } from '../ui/Card';
 import { RISK_LEVEL_CONFIG } from '../../config/theme';
+import { useLanguage } from '../../context/LanguageContext';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface HazardRiskBarProps {
@@ -9,24 +10,36 @@ interface HazardRiskBarProps {
 }
 
 export const HazardRiskBar: React.FC<HazardRiskBarProps> = ({ hazards }) => {
+  const { t } = useLanguage();
+
+  const getLevelLabel = (level: string) => {
+    switch (level.toLowerCase()) {
+      case 'low': return t('risk.levelLow');
+      case 'moderate': return t('risk.levelModerate');
+      case 'high': return t('risk.levelHigh');
+      case 'extreme': return t('risk.levelExtreme');
+      default: return level;
+    }
+  };
+
   const getTrendIcon = (trend: 'increasing' | 'stable' | 'decreasing') => {
     switch (trend) {
       case 'increasing':
         return (
           <span className="flex items-center gap-1 text-[10px] text-red-400 font-mono">
-            <TrendingUp className="w-3 h-3" /> Rising
+            <TrendingUp className="w-3 h-3" /> {t('risk.trendRising')}
           </span>
         );
       case 'decreasing':
         return (
           <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
-            <TrendingDown className="w-3 h-3" /> Falling
+            <TrendingDown className="w-3 h-3" /> {t('risk.trendFalling')}
           </span>
         );
       default:
         return (
           <span className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
-            <Minus className="w-3 h-3" /> Steady
+            <Minus className="w-3 h-3" /> {t('risk.trendSteady')}
           </span>
         );
     }
@@ -49,7 +62,7 @@ export const HazardRiskBar: React.FC<HazardRiskBarProps> = ({ hazards }) => {
                 <span
                   className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${config.bg} ${config.border} ${config.textColor}`}
                 >
-                  {hz.score} / 100 ({hz.level})
+                  {hz.score} / 100 ({getLevelLabel(hz.level)})
                 </span>
               </div>
             </div>

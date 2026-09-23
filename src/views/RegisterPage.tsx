@@ -4,12 +4,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { User, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const [name, setName] = useState('');
@@ -26,22 +28,22 @@ export const RegisterPage: React.FC = () => {
     setError(null);
 
     if (!name.trim()) {
-      setError('Please enter your full name.');
+      setError(t('auth.register.errorName', 'Please enter your full name.'));
       return;
     }
 
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Please enter a valid email address.');
+      setError(t('auth.register.errorEmail', 'Please enter a valid email address.'));
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+      setError(t('auth.register.errorPassword', 'Password must be at least 8 characters long.'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match. Please re-enter.');
+      setError(t('auth.register.errorMatch', 'Passwords do not match. Please re-enter.'));
       return;
     }
 
@@ -73,10 +75,10 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Create Account
+            {t('auth.register.title', 'Create Account')}
           </h1>
           <p className="text-xs text-slate-400">
-            Join the WeatherGPT Disaster Resilience Network (MoES / IMD)
+            {t('auth.register.subtitle', 'Join the WeatherGPT Disaster Resilience Network (MoES / IMD)')}
           </p>
         </div>
 
@@ -92,14 +94,16 @@ export const RegisterPage: React.FC = () => {
           {success && (
             <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3 text-xs text-emerald-300 animate-in fade-in">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span>Account created successfully! Redirecting to sign in...</span>
+              <span>{t('auth.register.success', 'Account created successfully! Redirecting to sign in...')}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">Full Name</label>
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t('auth.register.fullName', 'Full Name')}
+              </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -115,7 +119,9 @@ export const RegisterPage: React.FC = () => {
 
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">Email Address</label>
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t('auth.register.email', 'Email Address')}
+              </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -131,7 +137,9 @@ export const RegisterPage: React.FC = () => {
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">Password (min 8 characters)</label>
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t('auth.register.password', 'Password (min 8 characters)')}
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -156,7 +164,9 @@ export const RegisterPage: React.FC = () => {
 
             {/* Confirm Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">Confirm Password</label>
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t('auth.register.confirmPassword', 'Confirm Password')}
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -179,15 +189,17 @@ export const RegisterPage: React.FC = () => {
               disabled={loading || success}
               icon={!loading ? <ArrowRight className="w-4 h-4" /> : undefined}
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading
+                ? t('auth.register.submitting', 'Creating Account...')
+                : t('auth.register.submit', 'Create Account')}
             </Button>
           </form>
 
           {/* Login Redirect */}
           <div className="text-center pt-2 text-xs text-slate-400">
-            Already have an account?{' '}
+            {t('auth.register.hasAccount', 'Already have an account?')}{' '}
             <Link href="/login" className="text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-4">
-              Sign in
+              {t('auth.register.signIn', 'Sign in')}
             </Link>
           </div>
         </Card>

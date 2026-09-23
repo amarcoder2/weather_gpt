@@ -20,6 +20,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useVoice } from '../../context/VoiceContext';
 import { useAuth } from '../../context/AuthContext';
 import { DEFAULT_LOCATIONS } from '../../config/constants';
+import { locationService } from '../../services/locationService';
+import { LocationInfo } from '../../types/location';
 import { Button } from '../ui/Button';
 
 interface HeaderProps {
@@ -29,7 +31,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
   const {
     activeLocationId,
-    setActiveLocationId,
+    setActiveLocation,
     activeLocation,
     isUsingCurrentLocation,
     detectAndSetCurrentLocation,
@@ -42,8 +44,31 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+  const [dropdownQuery, setDropdownQuery] = useState('');
+  const [dropdownResults, setDropdownResults] = useState<LocationInfo[]>([]);
+  const [isDropdownSearching, setIsDropdownSearching] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Debounced search inside the location dropdown
+  React.useEffect(() => {
+    if (!isLocationDropdownOpen || !dropdownQuery.trim()) {
+      setDropdownResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsDropdownSearching(true);
+      try {
+        const results = await locationService.searchLocations(dropdownQuery, { limit: 8 });
+        setDropdownResults(results);
+      } catch {
+        // Safe fallback
+      } finally {
+        setIsDropdownSearching(false);
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [dropdownQuery, isLocationDropdownOpen]);
 
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,20 +84,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
       return;
     }
 
-    // Check if matches location
-    const matchedLoc = DEFAULT_LOCATIONS.find(
-      (l) =>
-        l.name.toLowerCase().includes(q) ||
-        l.district.toLowerCase().includes(q) ||
-        l.state.toLowerCase().includes(q)
-    );
-
-    if (matchedLoc) {
-      setActiveLocationId(matchedLoc.id);
-      router.push('/dashboard');
-    } else {
-      router.push(`/chat?q=${encodeURIComponent(searchQuery)}`);
+    // Search nationwide database for location match
+    try {
+      const matched = await locationService.searchLocations(searchQuery, { limit: 5 });
+      if (matched && matched.length > 0) {
+        setActiveLocation(matched[0]);
+        router.push('/dashboard');
+        setSearchQuery('');
+        return;
+      }
+    } catch {
+      // Fall through to meteorological reasoning chat
     }
+
+    router.push(`/chat?q=${encodeURIComponent(searchQuery)}`);
     setSearchQuery('');
   };
 
@@ -120,7 +145,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
             type="button"
             onClick={openVoiceModal}
             className="p-1 text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded-full transition-colors"
-            title="Voice query"
+            title={t('header.voiceQuery', 'Voice query')}
             aria-label="Voice search"
           >
             <Mic className="w-3.5 h-3.5" />
@@ -153,66 +178,137 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
           </button>
 
           {isLocationDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-60 bg-navy-900 border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95">
-              {/* Option 1: Current GPS Location Action */}
-              <button
-                onClick={async () => {
-                  await detectAndSetCurrentLocation();
-                  setIsLocationDropdownOpen(false);
-                  router.push('/dashboard');
-                }}
-                disabled={locationLoading}
-                className={`w-full text-left px-3 py-2.5 text-xs flex items-center gap-2.5 border-b border-slate-800 transition-colors ${
-                  isUsingCurrentLocation
-                    ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
-                    : 'text-slate-100 hover:bg-slate-800'
-                }`}
-              >
-                <Navigation className={`w-4 h-4 text-emerald-400 shrink-0 ${locationLoading ? 'animate-spin' : ''}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white">📍 Use Current Location</span>
-                    {isUsingCurrentLocation && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-slate-400 truncate">
-                    {locationLoading ? 'Acquiring GPS fix...' : 'Live browser coordinates & telemetry'}
-                  </p>
+            <div className="absolute right-0 mt-2 w-72 bg-navy-900 border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95">
+              {/* Nationwide Quick Search Input */}
+              <div className="p-2 border-b border-slate-800">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={dropdownQuery}
+                    onChange={(e) => setDropdownQuery(e.target.value)}
+                    placeholder="Search 7,000+ Indian cities..."
+                    className="w-full h-8 pl-8 pr-2.5 bg-navy-950 border border-slate-700/80 rounded-lg text-[11px] text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500"
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
                 </div>
-              </button>
-
-              <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                IMD Observatories
               </div>
 
-              <div className="max-h-56 overflow-y-auto">
-                {DEFAULT_LOCATIONS.map((loc) => (
+              {dropdownQuery.trim() ? (
+                /* Dynamic Nationwide Search Results */
+                <div className="max-h-60 overflow-y-auto">
+                  {isDropdownSearching ? (
+                    <div className="py-4 text-center text-xs text-sky-400">Searching...</div>
+                  ) : dropdownResults.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-slate-400">No locations found</div>
+                  ) : (
+                    dropdownResults.map((loc) => (
+                      <button
+                        key={loc.id}
+                        onClick={() => {
+                          setActiveLocation(loc);
+                          setIsLocationDropdownOpen(false);
+                          setDropdownQuery('');
+                          router.push('/dashboard');
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-slate-800 transition-colors flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-white truncate">{loc.name}</span>
+                            {loc.localityType && (
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">
+                                {loc.localityType}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {loc.district}, {loc.state}
+                          </p>
+                        </div>
+                        <span className="text-[9px] font-mono text-slate-500 shrink-0">
+                          {loc.lat.toFixed(1)}°, {loc.lon.toFixed(1)}°
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : (
+                /* Default List: GPS + Core Observatories */
+                <>
+                  {/* Option 1: Current GPS Location Action */}
                   <button
-                    key={loc.id}
-                    onClick={() => {
-                      setActiveLocationId(loc.id);
+                    onClick={async () => {
+                      await detectAndSetCurrentLocation();
                       setIsLocationDropdownOpen(false);
                       router.push('/dashboard');
                     }}
-                    className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition-colors ${
-                      !isUsingCurrentLocation && loc.id === activeLocationId
-                        ? 'text-sky-400 font-semibold bg-sky-500/10'
-                        : 'text-slate-300'
+                    disabled={locationLoading}
+                    className={`w-full text-left px-3 py-2.5 text-xs flex items-center gap-2.5 border-b border-slate-800 transition-colors ${
+                      isUsingCurrentLocation
+                        ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                        : 'text-slate-100 hover:bg-slate-800'
                     }`}
                   >
-                    <div>
-                      <p>{loc.name}</p>
-                      <p className="text-[10px] text-slate-400 font-normal">{loc.state}</p>
+                    <Navigation className={`w-4 h-4 text-emerald-400 shrink-0 ${locationLoading ? 'animate-spin' : ''}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white">📍 {t('header.useCurrentLocation', 'Use Current Location')}</span>
+                        {isUsingCurrentLocation && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            {t('common.active', 'Active')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {locationLoading ? t('header.acquiringGPS', 'Acquiring GPS fix...') : t('header.liveCoordinates', 'Live browser coordinates & telemetry')}
+                      </p>
                     </div>
-                    {loc.stationCode && (
-                      <span className="text-[10px] font-mono text-slate-500">{loc.stationCode}</span>
-                    )}
                   </button>
-                ))}
-              </div>
+
+                  <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>{t('header.observatories', 'Primary IMD Hubs')}</span>
+                    <span className="text-[9px] text-sky-400">Nationwide Available</span>
+                  </div>
+
+                  <div className="max-h-52 overflow-y-auto">
+                    {DEFAULT_LOCATIONS.map((loc) => (
+                      <button
+                        key={loc.id}
+                        onClick={() => {
+                          setActiveLocation(loc);
+                          setIsLocationDropdownOpen(false);
+                          router.push('/dashboard');
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition-colors ${
+                          !isUsingCurrentLocation && loc.id === activeLocationId
+                            ? 'text-sky-400 font-semibold bg-sky-500/10'
+                            : 'text-slate-300'
+                        }`}
+                      >
+                        <div>
+                          <p>{loc.name}</p>
+                          <p className="text-[10px] text-slate-400 font-normal">{loc.state}</p>
+                        </div>
+                        {loc.stationCode && (
+                          <span className="text-[10px] font-mono text-slate-500">{loc.stationCode}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-2 border-t border-slate-800 bg-slate-900/40">
+                    <Link
+                      href="/locations"
+                      onClick={() => setIsLocationDropdownOpen(false)}
+                      className="block text-center text-[11px] font-medium text-sky-400 hover:text-sky-300 transition-colors"
+                    >
+                      Browse All 7,000+ Locations &rarr;
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -222,7 +318,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
           <button
             onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
             className="p-2 rounded-lg bg-navy-900 border border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-            title="Change Language"
+            title={t('header.changeLanguage', 'Change Language')}
             aria-label="Language selection"
           >
             <Globe2 className="w-4 h-4" />
@@ -231,7 +327,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
           {isLangDropdownOpen && (
             <div className="absolute right-0 mt-2 w-44 bg-navy-900 border border-slate-700 rounded-xl shadow-2xl py-1 z-50 max-h-64 overflow-y-auto animate-in fade-in zoom-in-95">
               <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                Languages (भाषा)
+                {t('header.languages', 'Languages (भाषा)')}
               </div>
               {languages.map((lang) => (
                 <button
@@ -256,7 +352,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
         <button
           onClick={openVoiceModal}
           className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 hover:border-sky-400 transition-colors"
-          title="Voice Command & Speech Assistant"
+          title={t('header.voiceAssistant', 'Voice Command & Speech Assistant')}
           aria-label="Voice input"
         >
           <Mic className="w-4 h-4" />
@@ -266,7 +362,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
         <button
           onClick={onOpenNotifications}
           className="relative p-2 rounded-lg bg-navy-900 border border-slate-700/80 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-          title="Active Alerts & Bulletins"
+          title={t('header.activeAlerts', 'Active Alerts & Bulletins')}
           aria-label="Disaster Alerts"
         >
           <Bell className="w-4 h-4" />
@@ -304,7 +400,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
                   <span className={`inline-block mt-1 text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
                     role === 'admin' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                   }`}>
-                    Role: {role}
+                    {t('header.role', 'Role')}: {role}
                   </span>
                 </div>
 
@@ -315,7 +411,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
                     className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2 text-amber-300 hover:bg-slate-800 transition-colors"
                   >
                     <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Admin Operations Console</span>
+                    <span>{t('nav.admin', 'Admin Operations Console')}</span>
                   </Link>
                 )}
 
@@ -325,7 +421,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
                   className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2 text-slate-300 hover:bg-slate-800 transition-colors"
                 >
                   <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Account Settings</span>
+                  <span>{t('header.accountSettings', 'Account Settings')}</span>
                 </Link>
 
                 <div className="pt-1 border-t border-slate-800">
@@ -337,7 +433,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
                     className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2 text-red-400 hover:bg-red-500/10 transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5 text-red-400" />
-                    <span>Sign Out</span>
+                    <span>{t('common.signOut', 'Sign Out')}</span>
                   </button>
                 </div>
               </div>
@@ -347,12 +443,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenNotifications }) => {
           <div className="flex items-center gap-1.5">
             <Link href="/login">
               <Button variant="secondary" size="sm">
-                Login
+                {t('common.signIn', 'Login')}
               </Button>
             </Link>
             <Link href="/register" className="hidden sm:inline-block">
               <Button variant="primary" size="sm">
-                Register
+                {t('common.createAccount', 'Register')}
               </Button>
             </Link>
           </div>

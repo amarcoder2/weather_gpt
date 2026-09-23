@@ -21,7 +21,7 @@ export interface ApiResponseEnvelope<T> {
 }
 
 class ApiClient {
-  private activeRole: DemoRole = 'SUPER_ADMIN';
+  private activeRole: DemoRole = 'USER';
   private authToken: string | null = null;
   private baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -31,63 +31,63 @@ class ApiClient {
 
   setActiveRole(role: DemoRole): void {
     this.activeRole = role;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('weathergpt_simulated_role', role);
-    }
   }
 
   setAuthToken(token: string | null): void {
+    // In-memory token management only; never store JWT in localStorage
     this.authToken = token;
     if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('weathergpt_access_token', token);
-      } else {
+      try {
         localStorage.removeItem('weathergpt_access_token');
+        localStorage.removeItem('weathergpt_simulated_role');
+      } catch {
+        // Safe handling for storage restrictions
       }
     }
   }
 
   getAuthToken(): string | null {
-    if (!this.authToken && typeof window !== 'undefined') {
-      this.authToken = localStorage.getItem('weathergpt_access_token');
-    }
     return this.authToken;
   }
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('weathergpt_simulated_role') as DemoRole;
-      if (saved) {
-        this.activeRole = saved;
-      }
-      const savedToken = localStorage.getItem('weathergpt_access_token');
-      if (savedToken) {
-        this.authToken = savedToken;
+      try {
+        // Security cleanup: Purge any legacy tokens from localStorage
+        localStorage.removeItem('weathergpt_access_token');
+        localStorage.removeItem('weathergpt_simulated_role');
+      } catch {
+        // Safe handling
       }
     }
   }
 
   private resolveUrl(path: string): string {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    let target = `/api${cleanPath}`;
+
     if (
       cleanPath.startsWith('/auth') ||
       cleanPath.startsWith('/location') ||
-      cleanPath.startsWith('/weather/coordinates')
+      cleanPath.startsWith('/weather/coordinates') ||
+      cleanPath.startsWith('/admin')
     ) {
-      return `/api${cleanPath}`;
+      target = `/api${cleanPath}`;
+    } else if (this.baseUrl && !this.baseUrl.includes('localhost:5001')) {
+      target = `${this.baseUrl}${cleanPath}`;
     }
-    if (this.baseUrl && !this.baseUrl.includes('localhost:5001')) {
-      return `${this.baseUrl}${cleanPath}`;
+
+    if (typeof window === 'undefined' && !target.startsWith('http')) {
+      const origin = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
+      return `${origin}${target}`;
     }
-    return `/api${cleanPath}`;
+
+    return target;
   }
 
   private getHeaders(): HeadersInit {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-WeatherGPT-Role': this.activeRole,
-      'X-WeatherGPT-Uid': `demo_${this.activeRole.toLowerCase()}_user`,
-      'X-WeatherGPT-Email': `${this.activeRole.toLowerCase()}@weathergpt.gov.in`,
     };
 
     const token = this.getAuthToken();
@@ -103,6 +103,7 @@ class ApiClient {
       const res = await fetch(this.resolveUrl(path), {
         method: 'GET',
         headers: this.getHeaders(),
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) {
@@ -127,6 +128,7 @@ class ApiClient {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify(body),
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) {
@@ -151,6 +153,7 @@ class ApiClient {
         method: 'PATCH',
         headers: this.getHeaders(),
         body: JSON.stringify(body),
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) {
@@ -174,6 +177,7 @@ class ApiClient {
       const res = await fetch(this.resolveUrl(path), {
         method: 'DELETE',
         headers: this.getHeaders(),
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) {

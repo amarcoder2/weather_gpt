@@ -4,12 +4,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/dashboard';
@@ -25,7 +27,7 @@ export const LoginPage: React.FC = () => {
     setError(null);
 
     if (!email.trim() || !password) {
-      setError('Please provide both your email and password.');
+      setError(t('auth.login.errorEmail', 'Please provide both your email and password.'));
       return;
     }
 
@@ -34,7 +36,7 @@ export const LoginPage: React.FC = () => {
       await login(email.trim(), password);
       router.push(redirect);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Invalid email or password.';
+      const msg = err instanceof Error ? err.message : t('auth.login.errorInvalid', 'Invalid email or password.');
       setError(msg);
     } finally {
       setLoading(false);
@@ -61,10 +63,10 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Sign In to <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">WeatherGPT</span>
+            {t('auth.login.title', 'Sign In to WeatherGPT')}
           </h1>
           <p className="text-xs text-slate-400">
-            Ministry of Earth Sciences · India Meteorological Department (SIH 2026 #26068)
+            {t('auth.login.subtitle', 'Ministry of Earth Sciences · India Meteorological Department (SIH 2026 #26068)')}
           </p>
         </div>
 
@@ -80,7 +82,9 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">Official or Personal Email</label>
+              <label className="text-xs font-semibold text-slate-300 block">
+                {t('auth.login.email', 'Official or Personal Email')}
+              </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -97,7 +101,9 @@ export const LoginPage: React.FC = () => {
             {/* Password Field */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <label className="text-xs font-semibold text-slate-300">
+                  {t('auth.login.password', 'Password')}
+                </label>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -130,7 +136,7 @@ export const LoginPage: React.FC = () => {
               disabled={loading}
               icon={!loading ? <ArrowRight className="w-4 h-4" /> : undefined}
             >
-              {loading ? 'Authenticating...' : 'Sign In'}
+              {loading ? t('auth.login.submitting', 'Authenticating...') : t('auth.login.submit', 'Sign In')}
             </Button>
           </form>
 
@@ -138,7 +144,7 @@ export const LoginPage: React.FC = () => {
           <div className="pt-4 border-t border-slate-800 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-mono text-slate-400 block font-semibold">
-                Quick-Fill Account Email:
+                {t('auth.login.quickFill', 'Quick-Fill Account Email:')}
               </span>
               <span className="text-[10px] text-slate-500 font-mono">SIH Judging</span>
             </div>
@@ -149,7 +155,7 @@ export const LoginPage: React.FC = () => {
                 className="px-2.5 py-1.5 rounded-lg bg-navy-950 border border-slate-800 text-[11px] text-slate-300 hover:border-sky-500/50 hover:text-sky-300 transition-colors flex items-center justify-between"
                 title="Fill citizen demo email"
               >
-                <span>Citizen User</span>
+                <span>{t('auth.login.citizenUser', 'Citizen User')}</span>
                 <span className="text-[9px] font-mono text-slate-500">user@</span>
               </button>
               <button
@@ -158,20 +164,21 @@ export const LoginPage: React.FC = () => {
                 className="px-2.5 py-1.5 rounded-lg bg-navy-950 border border-slate-800 text-[11px] text-slate-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors flex items-center justify-between"
                 title="Fill IMD admin email"
               >
-                <span>IMD Admin</span>
+                <span>{t('auth.login.imdAdmin', 'IMD Admin')}</span>
                 <span className="text-[9px] font-mono text-amber-500">admin@</span>
               </button>
             </div>
-            <p className="text-[10px] text-slate-500 leading-tight">
-              Enter your environment-configured password (or run <code className="text-slate-400">npm run db:seed</code>).
-            </p>
+            <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-500">
+              <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span>{t('auth.login.compliance', 'Secured via JWT HttpOnly Cookies & SHA-256 Auth Flow')}</span>
+            </div>
           </div>
 
           {/* Registration Redirect */}
           <div className="text-center pt-1 text-xs text-slate-400">
-            Don’t have an account yet?{' '}
+            {t('auth.login.noAccount', 'Don’t have an account yet?')}{' '}
             <Link href="/register" className="text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-4">
-              Create an account
+              {t('auth.login.signUp', 'Create an account')}
             </Link>
           </div>
         </Card>

@@ -35,29 +35,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = useCallback(async () => {
     try {
-      const storedToken = apiClient.getAuthToken();
-      if (!storedToken) {
-        setUser(null);
-        setRole('user');
-        setToken(null);
-        setLoading(false);
-        return;
-      }
-
       const res = await apiClient.get<{ user: AuthUser }>('/auth/me');
       if (res.success && res.data?.user) {
         setUser(res.data.user);
         setRole(res.data.user.role || 'user');
-        setToken(storedToken);
+        setToken('session_cookie_active');
       } else {
-        // Token invalid or expired
-        apiClient.setAuthToken(null);
         setUser(null);
         setRole('user');
         setToken(null);
       }
     } catch {
-      apiClient.setAuthToken(null);
       setUser(null);
       setRole('user');
       setToken(null);
@@ -73,8 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string) => {
     setError(null);
     const res = await apiClient.post<{
-      access_token: string;
-      token_type: string;
+      access_token?: string;
+      token_type?: string;
       user: AuthUser;
       error?: string;
     }>('/auth/login', {
@@ -82,12 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: pass,
     });
 
-    if (res.success && res.data?.access_token) {
-      const { access_token, user: loggedInUser } = res.data;
-      apiClient.setAuthToken(access_token);
-      setToken(access_token);
+    if (res.success && res.data?.user) {
+      const loggedInUser = res.data.user;
       setUser(loggedInUser);
       setRole(loggedInUser.role || 'user');
+      setToken('session_cookie_active');
       return;
     }
 

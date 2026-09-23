@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChatMessage } from '../../types/chat';
 import { Bot, User, Database, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 import { RichWeatherCard } from './RichWeatherCard';
 import { RichAlertCard } from './RichAlertCard';
 import { RichAdvisoryCard } from './RichAdvisoryCard';
@@ -14,6 +15,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   message,
   onFollowupSelect,
 }) => {
+  const { t } = useLanguage();
   const isAssistant = message.sender === 'assistant';
 
   // Basic markdown text rendering for bolding and bullets
@@ -68,7 +70,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
       >
         {/* Message Header */}
         <div className="flex items-center justify-between gap-4 mb-2 pb-1.5 border-b border-white/10 text-[11px] opacity-75">
-          <span className="font-semibold">{isAssistant ? 'WeatherGPT AI' : 'You'}</span>
+          <span className="font-semibold">{isAssistant ? t('chat.assistantName') : t('chat.userName')}</span>
           <span className="font-mono">{message.timestamp}</span>
         </div>
 
@@ -90,7 +92,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         {message.sources && message.sources.length > 0 && (
           <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
             <Database className="w-3 h-3 text-sky-400 shrink-0" />
-            <span className="font-medium text-slate-400">Data Feeds:</span>
+            <span className="font-medium text-slate-400">{t('chat.dataFeeds')}</span>
             {message.sources.map((src, i) => (
               <span
                 key={i}
@@ -105,7 +107,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         {/* Suggested Followups */}
         {message.suggestedFollowups && message.suggestedFollowups.length > 0 && (
           <div className="mt-3 pt-2 border-t border-slate-800/80">
-            <p className="text-[11px] text-slate-400 mb-1.5 font-medium">Related Questions:</p>
+            <p className="text-[11px] text-slate-400 mb-1.5 font-medium">{t('chat.relatedQuestions')}</p>
             <div className="flex flex-wrap gap-1.5">
               {message.suggestedFollowups.map((fu, idx) => (
                 <button

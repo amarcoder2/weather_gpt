@@ -4,10 +4,10 @@ import React from 'react';
 import { MapStation } from '../../types/map';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { X, ArrowRight, Droplets, Wind, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWeather } from '../../context/WeatherContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface StationPopoverProps {
   station: MapStation;
@@ -17,6 +17,7 @@ interface StationPopoverProps {
 export const StationPopover: React.FC<StationPopoverProps> = ({ station, onClose }) => {
   const router = useRouter();
   const { setActiveLocationId, formatTemp } = useWeather();
+  const { t } = useLanguage();
 
   const handleOpenDashboard = () => {
     setActiveLocationId(station.id);
@@ -42,7 +43,7 @@ export const StationPopover: React.FC<StationPopoverProps> = ({ station, onClose
         <button
           onClick={onClose}
           className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-          aria-label="Close observatory details"
+          aria-label={t('common.close', 'Close')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -62,7 +63,7 @@ export const StationPopover: React.FC<StationPopoverProps> = ({ station, onClose
       <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-800 text-slate-300">
         <div className="flex items-center gap-1.5">
           <Droplets className="w-3.5 h-3.5 text-sky-400" />
-          <span>Humidity: {station.humidity}%</span>
+          <span>{t('explorer.popover.humidity', 'Humidity:')} {station.humidity}%</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Wind className="w-3.5 h-3.5 text-indigo-400" />
@@ -75,7 +76,7 @@ export const StationPopover: React.FC<StationPopoverProps> = ({ station, onClose
         <div className="flex items-center justify-between">
           <span className="text-slate-400 flex items-center gap-1">
             <ShieldAlert className="w-3.5 h-3.5 text-purple-400" />
-            Risk Vulnerability:
+            {t('explorer.popover.riskVulnerability', 'Risk Vulnerability:')}
           </span>
           <span className="font-bold text-white">
             {station.riskScore}/100 ({station.riskLevel})
@@ -101,7 +102,7 @@ export const StationPopover: React.FC<StationPopoverProps> = ({ station, onClose
         className="w-full mt-3"
         icon={<ArrowRight className="w-3.5 h-3.5" />}
       >
-        Set as Active Observatory
+        {t('explorer.popover.viewForecast', 'View Full Forecast')}
       </Button>
     </Card>
   );

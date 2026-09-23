@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useWeather } from '../context/WeatherContext';
+import { useLanguage } from '../context/LanguageContext';
 import { OverallRiskGauge } from '../components/risk/OverallRiskGauge';
 import { HazardRiskBar } from '../components/risk/HazardRiskBar';
 import { RiskExplanationModal } from '../components/risk/RiskExplanationModal';
@@ -13,6 +14,7 @@ import { ShieldAlert, Info, Database, CheckCircle2 } from 'lucide-react';
 
 export const RiskIntelligencePage: React.FC = () => {
   const { risk, loading, error } = useWeather();
+  const { t } = useLanguage();
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
 
   if (loading) {
@@ -31,8 +33,8 @@ export const RiskIntelligencePage: React.FC = () => {
     return (
       <div className="p-8 max-w-md mx-auto">
         <EmptyState
-          title="Risk Engine Offline"
-          description="Unable to compute composite vulnerability index for this location."
+          title={t('risk.engineOffline')}
+          description={t('risk.engineOfflineDesc')}
         />
       </div>
     );
@@ -46,17 +48,17 @@ export const RiskIntelligencePage: React.FC = () => {
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-purple-400" />
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              Multi-Hazard Risk Intelligence
+              {t('risk.title')}
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Predictive vulnerability scoring synthesizing precipitation anomalies, thermodynamic energy, and hydrologic baselines
+            {t('risk.subtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-2 bg-navy-900 px-3 py-1.5 rounded-full border border-slate-800 text-xs font-mono text-slate-400">
           <Database className="w-3.5 h-3.5 text-sky-400" />
-          <span>Demo Risk Model (Phase 1)</span>
+          <span>{t('risk.demoModel')}</span>
         </div>
       </div>
 
@@ -72,10 +74,10 @@ export const RiskIntelligencePage: React.FC = () => {
           <Card variant="glass" className="p-5 border-slate-800 text-xs text-slate-400 space-y-2">
             <div className="flex items-center gap-1.5 text-sky-400 font-semibold">
               <Info className="w-4 h-4" />
-              <span>Diagnostic Explainability Engine</span>
+              <span>{t('risk.diagnosticEngine')}</span>
             </div>
             <p className="leading-relaxed">
-              In accordance with ethical AI standards, WeatherGPT does not output "black-box" risk numbers. Every vulnerability score is linked to transparent physical drivers (e.g., CAPE indices, WRF precipitation, river stage measurements).
+              {t('risk.diagnosticDesc')}
             </p>
           </Card>
         </div>
@@ -83,9 +85,9 @@ export const RiskIntelligencePage: React.FC = () => {
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Categorical Hazard Severity Breakdown
+              {t('risk.hazardBreakdown')}
             </h3>
-            <span className="text-xs text-slate-400 font-mono">6 Sensor Layers</span>
+            <span className="text-xs text-slate-400 font-mono">{t('risk.sensorLayers')}</span>
           </div>
 
           <HazardRiskBar hazards={risk.hazards} />
@@ -95,17 +97,17 @@ export const RiskIntelligencePage: React.FC = () => {
       {/* Risk Factors Breakdown Table */}
       <Card variant="glass" className="p-6">
         <h3 className="text-base font-bold text-white mb-4">
-          Environmental Drivers & Hazard Multipliers
+          {t('risk.driversTitle')}
         </h3>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400">
-                <th className="pb-3 font-semibold">Risk Factor</th>
-                <th className="pb-3 font-semibold">Observed Metric / Telemetry</th>
-                <th className="pb-3 font-semibold">Weightage</th>
-                <th className="pb-3 font-semibold">Physical Consequence</th>
+                <th className="pb-3 font-semibold">{t('risk.tableRiskFactor')}</th>
+                <th className="pb-3 font-semibold">{t('risk.tableMetric')}</th>
+                <th className="pb-3 font-semibold">{t('risk.tableWeightage')}</th>
+                <th className="pb-3 font-semibold">{t('risk.tableConsequence')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">

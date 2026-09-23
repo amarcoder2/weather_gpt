@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { userRepository } from '../../../../lib/db/postgres';
-import { signToken, verifyVault, signVault } from '../../../../lib/auth/jwt';
-import { DbUser } from '../../../../types/auth';
+import { signToken } from '../../../../lib/auth/jwt';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,27 +18,16 @@ export async function POST(req: NextRequest) {
     const normalizedEmail = email.toLowerCase().trim();
     let user = await userRepository.findByEmail(normalizedEmail);
 
-    // Fallback: recover user from signed vault cookie across serverless cold starts
-    if (!user) {
-      const vaultCookie = req.cookies.get('weathergpt_user_vault')?.value;
-      const vaultUser = vaultCookie ? verifyVault<DbUser>(vaultCookie) : null;
-      if (vaultUser && vaultUser.email.toLowerCase() === normalizedEmail) {
-        user = vaultUser;
-      }
-    }
-
-    // Server-side admin authentication via Vercel environment variable ADMIN_PASSWORD
+    // Server-side admin authentication check via ADMIN_PASSWORD environment variable
     const adminEmail = (process.env.ADMIN_EMAIL || process.env.DEMO_ADMIN_EMAIL || 'admin@weathergpt.gov.in').toLowerCase().trim();
     const envAdminPassword = process.env.ADMIN_PASSWORD || process.env.DEMO_ADMIN_PASSWORD;
 
     let isMatch = false;
-    let isAdminAuth = false;
 
-    // Direct administrative check using server-side ADMIN_PASSWORD
+    // Direct administrative check using server-side ADMIN_PASSWORD if configured
     if (envAdminPassword && (normalizedEmail === adminEmail || (user && user.role === 'admin'))) {
       if (password === envAdminPassword) {
         isMatch = true;
-        isAdminAuth = true;
         if (!user) {
           user = {
             id: 'usr_admin_root',
@@ -56,12 +44,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If not authenticated via ADMIN_PASSWORD, check bcrypt hash for standard registered users
+    // Standard user password verification via bcrypt hash
     if (!isMatch && user && user.password_hash) {
       isMatch = await bcrypt.compare(password, user.password_hash);
     }
 
-    // Generic error to avoid user enumeration if both checks fail
+    // Generic error to prevent user enumeration
     if (!isMatch || !user) {
       return NextResponse.json(
         { error: 'Invalid email or password.' },
@@ -69,10 +57,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update last login
-    await userRepository.updateLastLogin(user.id);
+    // Check account status: enforce suspension
+    if (user.status && user.status.toUpperCase() === 'SUSPENDED') {
+      return NextResponse.json(
+        { error: 'This account has been suspended by an administrator. Please contact operations support.' },
+        { status: 403 }
+      );
+    }
 
-    // Sign JWT
+    // Update last login timestamp in background
+    userRepository.updateLastLogin(user.id).catch(() => {});
+
+    // Sign cryptographic JWT token
     const token = signToken({
       userId: user.id,
       email: user.email,
@@ -99,7 +95,7 @@ export async function POST(req: NextRequest) {
       user: safeUser,
     });
 
-    // Set HttpOnly cookie for server/browser compatibility
+    // Set secure HttpOnly session cookie
     response.cookies.set('weathergpt_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -108,30 +104,11 @@ export async function POST(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
 
-    // If authenticated as admin or user has admin role, refresh vault cookie with admin role
-    if (isAdminAuth || user.role === 'admin') {
-      const vaultToken = signVault({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: 'admin',
-        password_hash: user.password_hash || '',
-      });
-      response.cookies.set('weathergpt_user_vault', vaultToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-      });
-    }
-
     return response;
   } catch (err: unknown) {
-    console.error('Login API error:', err);
-    const message = err instanceof Error ? err.message : 'Internal server error while processing login.';
+    console.error('Login API error:', err instanceof Error ? err.message : 'Unknown');
     return NextResponse.json(
-      { error: message },
+      { error: 'An unexpected error occurred while processing your request. Please try again.' },
       { status: 500 }
     );
   }

@@ -8,6 +8,7 @@ import { GlobeFallback } from '../components/3d/GlobeFallback';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useWeather } from '../context/WeatherContext';
+import { useLanguage } from '../context/LanguageContext';
 import { DEFAULT_LOCATIONS, SIH_METADATA } from '../config/constants';
 import {
   CloudSun,
@@ -18,11 +19,9 @@ import {
   Globe2,
   Mic,
   ArrowRight,
-  Database,
   Cpu,
   Compass,
   FileCheck,
-  Zap,
   Navigation,
 } from 'lucide-react';
 
@@ -36,6 +35,7 @@ const AtmosphericGlobe = dynamic(
 
 export const LandingPage: React.FC = () => {
   const { setActiveLocationId, detectAndSetCurrentLocation, locationLoading } = useWeather();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const handleSelectLocation = (locId: string) => {
@@ -49,7 +49,7 @@ export const LandingPage: React.FC = () => {
     { title: 'Disaster Alerts', desc: 'Operational early warning bulletins for cyclones, flash floods, and severe heatwaves.', icon: AlertTriangle, color: 'text-red-400' },
     { title: 'Risk Intelligence', desc: 'Multi-hazard vulnerability scores with explainable scientific diagnostics.', icon: ShieldCheck, color: 'text-emerald-400' },
     { title: 'AI Conversational Engine', desc: 'Natural language understanding for plain-language questions and advisories.', icon: Bot, color: 'text-purple-400' },
-    { title: 'Multilingual Access', desc: 'Support for 11 regional Indian languages for rural and urban citizen access.', icon: Globe2, color: 'text-amber-400' },
+    { title: 'Multilingual Access', desc: 'Framework for 11 regional Indian languages with 4 fully localized and 7 with regional English fallback.', icon: Globe2, color: 'text-amber-400' },
     { title: 'Voice Interaction', desc: 'Hands-free voice query assistance designed for rural farmers and responders.', icon: Mic, color: 'text-cyan-400' },
     { title: 'Extreme Climate Tracking', desc: 'Decadal trends and meteorological anomalies compared against 30-year IMD normals.', icon: TrendingUp, color: 'text-rose-400' },
   ];
@@ -81,13 +81,13 @@ export const LandingPage: React.FC = () => {
 
             <div className="space-y-2">
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                Conversational AI for <br />
-                <span className="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                  Weather, Alerts & Disaster Risk
-                </span>
+                {t('landing.heroTitle', 'Conversational AI for Weather, Alerts & Disaster Risk')}
               </h1>
               <p className="text-sm sm:text-base text-slate-300 max-w-xl leading-relaxed">
-                Empowering India with instant meteorological intelligence, early cyclone & flood warnings, and explainable risk assessments for citizens, farmers, and disaster management authorities.
+                {t(
+                  'landing.heroSubtitle',
+                  'Empowering India with instant meteorological intelligence, early cyclone & flood warnings, and explainable risk assessments for citizens, farmers, and disaster management authorities.'
+                )}
               </p>
             </div>
 
@@ -95,7 +95,7 @@ export const LandingPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <Link href="/dashboard">
                 <Button size="lg" variant="primary" icon={<ArrowRight className="w-4 h-4" />}>
-                  Explore Weather Command Center
+                  {t('landing.getStarted', 'Explore Weather Command Center')}
                 </Button>
               </Link>
               <Button
@@ -108,11 +108,13 @@ export const LandingPage: React.FC = () => {
                 disabled={locationLoading}
                 icon={<Navigation className="w-4 h-4 text-emerald-400" />}
               >
-                {locationLoading ? 'Acquiring GPS...' : '📍 Detect My Location'}
+                {locationLoading
+                  ? t('landing.acquiringGps', 'Acquiring GPS...')
+                  : t('landing.exploreMap', '📍 Detect My Location')}
               </Button>
               <Link href="/chat">
                 <Button size="lg" variant="secondary" icon={<Bot className="w-4 h-4 text-purple-400" />}>
-                  Ask WeatherGPT
+                  {t('landing.askGpt', 'Ask WeatherGPT')}
                 </Button>
               </Link>
             </div>
@@ -120,7 +122,7 @@ export const LandingPage: React.FC = () => {
             {/* Quick Location Pills */}
             <div className="pt-4 border-t border-slate-800/80">
               <span className="text-xs text-slate-400 block mb-2 font-medium">
-                Jump to Meteorological Station or Real-Time Coordinates:
+                {t('landing.jumpToLocation', 'Jump to Meteorological Station or Real-Time Coordinates:')}
               </span>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -131,7 +133,7 @@ export const LandingPage: React.FC = () => {
                   className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-colors font-semibold flex items-center gap-1.5"
                 >
                   <Navigation className="w-3 h-3 text-emerald-400" />
-                  <span>📍 Current Location (GPS)</span>
+                  <span>{t('landing.currentGps', '📍 Current Location (GPS)')}</span>
                 </button>
                 {DEFAULT_LOCATIONS.map((loc) => (
                   <button
@@ -160,10 +162,13 @@ export const LandingPage: React.FC = () => {
             Disaster Management Theme · MoES & IMD
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            Bridging Complex Meteorological Science to Everyday Citizens
+            {t('landing.faqTitle', 'Bridging Complex Meteorological Science to Everyday Citizens')}
           </h2>
           <p className="text-xs sm:text-sm text-slate-400">
-            Why traditional weather websites fail during emergencies and how WeatherGPT solves it.
+            {t(
+              'landing.faqSubtitle',
+              'Why traditional weather websites fail during emergencies and how WeatherGPT solves it.'
+            )}
           </p>
         </div>
 
@@ -172,9 +177,12 @@ export const LandingPage: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400">
               <AlertTriangle className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white">The Problem</h3>
+            <h3 className="text-base font-bold text-white">{t('landing.theProblem', 'The Problem')}</h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Meteorological bulletins use dense jargon (isobars, CAPE, QPF) across fragmented websites. Farmers and rural citizens struggle to interpret whether heavy rain will destroy their crop or when storm surge will hit their village.
+              {t(
+                'landing.theProblemDesc',
+                'Meteorological bulletins use dense jargon (isobars, CAPE, QPF) across fragmented websites. Farmers and rural citizens struggle to interpret whether heavy rain will destroy their crop or when storm surge will hit their village.'
+              )}
             </p>
           </Card>
 
@@ -182,9 +190,12 @@ export const LandingPage: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
               <Cpu className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white">The Solution</h3>
+            <h3 className="text-base font-bold text-white">{t('landing.theSolution', 'The Solution')}</h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              WeatherGPT synthesizes Doppler radars, satellite imagery, and numerical forecasts into structured risk scores, delivering plain-language recommendations tailored to the specific citizen in their native tongue.
+              {t(
+                'landing.theSolutionDesc',
+                'WeatherGPT synthesizes Doppler radars, satellite imagery, and numerical forecasts into structured risk scores, delivering plain-language recommendations tailored to the specific citizen in their native tongue.'
+              )}
             </p>
           </Card>
 
@@ -192,22 +203,27 @@ export const LandingPage: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
               <FileCheck className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white">The Decision Support</h3>
+            <h3 className="text-base font-bold text-white">
+              {t('landing.theDecisionSupport', 'The Decision Support')}
+            </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Instead of simply displaying "85% precipitation", WeatherGPT tells farmers: <em>"Postpone pesticide spraying for 48 hours to prevent chemical runoff,"</em> saving livelihoods and securing disaster resilience.
+              {t(
+                'landing.theDecisionSupportDesc',
+                'Instead of simply displaying "85% precipitation", WeatherGPT tells farmers: "Postpone pesticide spraying for 48 hours to prevent chemical runoff," saving livelihoods and securing disaster resilience.'
+              )}
             </p>
           </Card>
         </div>
       </section>
 
-      {/* Visual System Data-Flow Architecture (Requirement 6) */}
+      {/* Visual System Data-Flow Architecture */}
       <section className="space-y-6">
         <div className="text-center max-w-2xl mx-auto space-y-2">
           <span className="text-xs font-mono text-sky-400 uppercase tracking-wider font-bold">
-            System Data-Flow Architecture
+            {t('landing.architectureSubtitle', 'System Data-Flow Architecture')}
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            How WeatherGPT Transforms Telemetry into Action
+            {t('landing.architectureTitle', 'How WeatherGPT Transforms Telemetry into Action')}
           </h2>
         </div>
 
@@ -239,10 +255,13 @@ export const LandingPage: React.FC = () => {
       <section className="space-y-6">
         <div className="text-center max-w-xl mx-auto space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-            Platform Capabilities
+            {t('landing.featuresTitle', 'Platform Capabilities')}
           </h2>
           <p className="text-xs sm:text-sm text-slate-400">
-            A serious meteorological intelligence platform built for government agencies, emergency managers, and citizens.
+            {t(
+              'landing.featuresSubtitle',
+              'A serious meteorological intelligence platform built for government agencies, emergency managers, and citizens.'
+            )}
           </p>
         </div>
 

@@ -23,6 +23,8 @@ export interface ChatMessage {
   };
   sources?: string[];
   suggestedFollowups?: string[];
+  resolvedLocation?: import('./location').LocationInfo;
+  locationSource?: 'explicit_query' | 'conversation_context' | 'selected_location' | 'current_location';
 }
 
 export interface ChatPromptSuggestion {

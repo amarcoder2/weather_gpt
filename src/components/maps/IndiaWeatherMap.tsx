@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { WeatherMapLayer, MapStation, MapRegion } from '../../types/map';
 import { LayerControls } from './LayerControls';
 import { StationPopover } from './StationPopover';
+import { useLanguage } from '../../context/LanguageContext';
+import { useWeather } from '../../context/WeatherContext';
 import {
   INDIA_BOUNDARY_PATH,
   ANDAMAN_NICOBAR_PATH,
@@ -11,13 +13,24 @@ import {
 } from '../../data/geoIndia';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { Navigation, Info, ShieldAlert, Thermometer, CloudRain, Wind } from 'lucide-react';
+import { Navigation, Info, ShieldAlert, Thermometer, CloudRain, Wind, MapPin } from 'lucide-react';
 
 interface IndiaWeatherMapProps {
   stations?: any[]; // For backwards compatibility
 }
 
+function projectCoords(lat: number, lon: number): { x: number; y: number } {
+  const x = ((lon - 68) / 30) * 450 + 100;
+  const y = ((37 - lat) / 29) * 580 + 30;
+  return {
+    x: Math.max(30, Math.min(570, Math.round(x))),
+    y: Math.max(30, Math.min(650, Math.round(y))),
+  };
+}
+
 export const IndiaWeatherMap: React.FC<IndiaWeatherMapProps> = () => {
+  const { t } = useLanguage();
+  const { activeLocation } = useWeather();
   const [activeLayer, setActiveLayer] = useState<WeatherMapLayer>('rainfall');
   const [selectedStation, setSelectedStation] = useState<MapStation | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<MapRegion | null>(null);
@@ -104,10 +117,10 @@ export const IndiaWeatherMap: React.FC<IndiaWeatherMapProps> = () => {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-            India Meteorological GIS Command Map
+            {t('explorer.map.gisTitle', 'India Meteorological GIS Command Map')}
           </h2>
           <p className="text-xs text-slate-400">
-            Geospatial projection of sovereign borders, regional sub-divisions, and 16 primary IMD observation stations
+            {t('explorer.map.gisSubtitle', 'Geospatial projection of sovereign borders, regional sub-divisions, and 16 primary IMD observation stations')}
           </p>
         </div>
 
@@ -235,6 +248,42 @@ export const IndiaWeatherMap: React.FC<IndiaWeatherMapProps> = () => {
                 </g>
               );
             })}
+
+            {/* Active Selected Location Pinpoint */}
+            {activeLocation && activeLocation.lat && activeLocation.lon && (() => {
+              const pt = projectCoords(activeLocation.lat, activeLocation.lon);
+              const isMatchStation = INDIA_MAP_STATIONS.some((s) => s.id.toLowerCase() === activeLocation.id.toLowerCase());
+              if (isMatchStation) return null;
+
+              return (
+                <g transform={`translate(${pt.x}, ${pt.y})`} className="cursor-pointer">
+                  <circle r="16" fill="rgba(16, 185, 129, 0.25)" className="animate-ping pointer-events-none" />
+                  <circle r="7" fill="#10b981" stroke="#ffffff" strokeWidth="2.2" />
+                  <rect
+                    x="-45"
+                    y="-26"
+                    width="90"
+                    height="18"
+                    rx="5"
+                    fill="#0a1936"
+                    stroke="#10b981"
+                    strokeWidth="1.2"
+                  />
+                  <text
+                    x="0"
+                    y="-14"
+                    textAnchor="middle"
+                    fontSize="9.5"
+                    fill="#34d399"
+                    fontFamily="Inter, sans-serif"
+                    fontWeight="bold"
+                    className="select-none pointer-events-none"
+                  >
+                    📍 {activeLocation.name.slice(0, 11)}
+                  </text>
+                </g>
+              );
+            })()}
           </svg>
 
           {/* Clicked Station Popover */}
@@ -251,7 +300,7 @@ export const IndiaWeatherMap: React.FC<IndiaWeatherMapProps> = () => {
                 <span className="text-xs font-bold text-white">{selectedRegion.name}</span>
                 <button
                   onClick={() => setSelectedRegion(null)}
-                  className="text-xs text-slate-400 hover:text-white"
+                  className="text-slate-400 hover:text-white text-xs"
                 >
                   ✕
                 </button>
@@ -280,10 +329,14 @@ export const IndiaWeatherMap: React.FC<IndiaWeatherMapProps> = () => {
             <span className="text-[9px] font-mono font-bold mt-0.5">N</span>
           </div>
 
-          {/* Live Station Count Indicator */}
-          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-navy-900/85 border border-slate-800 text-[11px] text-slate-300 font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>16 IMD Observatories Live</span>
+          {/* Live Station & Catalog Indicator */}
+          <div className="absolute top-4 left-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3 py-1.5 rounded-xl bg-navy-900/90 border border-slate-800 text-[11px] text-slate-300 font-mono backdrop-blur-md">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>16 IMD Radar Hubs</span>
+            </div>
+            <span className="hidden sm:inline text-slate-600">·</span>
+            <span className="text-[10px] text-sky-400 font-sans">7,392 Nationwide Localities Active</span>
           </div>
         </div>
 
@@ -353,7 +406,7 @@ export const IndiaWeatherMap: React.FC<IndiaWeatherMapProps> = () => {
           )}
 
           <span className="text-[11px] font-mono text-slate-500 ml-auto">
-            Projection: Albers Equidistant Conic (India)
+            {t('explorer.map.projection', 'Projection: Albers Equidistant Conic (India)')}
           </span>
         </div>
       </Card>

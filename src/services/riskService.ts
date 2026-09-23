@@ -1,52 +1,51 @@
 import { RiskAssessment } from '../types/risk';
-import { MOCK_RISK_ASSESSMENTS } from '../data/mockRisk';
+import { LocationInfo } from '../types/location';
+import { DEFAULT_LOCATIONS } from '../config/constants';
 import { apiClient } from './apiClient';
+import { locationService } from './locationService';
 
 export interface IRiskService {
-  getRiskAssessment(locationId: string): Promise<RiskAssessment>;
+  getRiskAssessment(locationOrId: string | LocationInfo): Promise<RiskAssessment>;
 }
 
 class RiskService implements IRiskService {
-  async getRiskAssessment(locationId: string): Promise<RiskAssessment> {
-    const normalized = locationId.toLowerCase();
-    try {
-      const res = await apiClient.get<Record<string, unknown>>(`/risk/${encodeURIComponent(normalized)}`);
-      if (res.success && res.data) {
-        const d = res.data;
-        const fallback = MOCK_RISK_ASSESSMENTS[normalized] || MOCK_RISK_ASSESSMENTS['kolkata'];
-        const levelMap: Record<string, RiskAssessment['overallLevel']> = {
-          LOW: 'Low',
-          MODERATE: 'Moderate',
-          ELEVATED: 'Moderate',
-          HIGH: 'High',
-          EXTREME: 'Extreme',
-        };
-        const rawLvl = ((d.riskLevel as string) || '').toUpperCase();
-        return {
-          locationId: normalized,
-          locationName: (d.locationName as string) || fallback.locationName,
-          overallScore: Number(
-            d.riskScore !== undefined
-              ? d.riskScore
-              : d.overallScore !== undefined
-              ? d.overallScore
-              : fallback.overallScore
-          ),
-          overallLevel: levelMap[rawLvl] || fallback.overallLevel,
-          assessmentDate: (d.calculatedAt as string) || (d.assessmentDate as string) || fallback.assessmentDate,
-          hazards: Array.isArray(d.hazards) ? d.hazards : fallback.hazards,
-          factors: Array.isArray(d.factors) ? d.factors : fallback.factors,
-          explanation: (d.explanation as string) || fallback.explanation,
-          recommendations: Array.isArray(d.recommendations) ? d.recommendations : fallback.recommendations,
-          isDemoData: true,
-        };
+  async getRiskAssessment(locationOrId: string | LocationInfo): Promise<RiskAssessment> {
+    let loc: LocationInfo | undefined;
+
+    if (typeof locationOrId === 'object' && locationOrId !== null) {
+      loc = locationOrId;
+    } else {
+      const normalized = locationOrId.toLowerCase().trim();
+      loc = await locationService.getLocationById(normalized);
+      if (!loc) {
+        loc = DEFAULT_LOCATIONS.find((l) => l.id.toLowerCase() === normalized);
       }
-    } catch {
-      // Fallback
     }
 
-    const data = MOCK_RISK_ASSESSMENTS[normalized] || MOCK_RISK_ASSESSMENTS['kolkata'];
-    return { ...data, isDemoData: true };
+    if (!loc) {
+      throw new Error(`Location "${typeof locationOrId === 'string' ? locationOrId : 'unknown'}" could not be resolved. Please search and select a valid location.`);
+    }
+
+    const params = new URLSearchParams({
+      latitude: loc.lat.toString(),
+      longitude: loc.lon.toString(),
+      city: loc.name,
+      district: loc.district,
+      state: loc.state,
+    });
+
+    const res = await apiClient.get<{ risk: RiskAssessment }>(`/weather/coordinates?${params.toString()}`);
+
+    if (!res.success || !res.data?.risk) {
+      throw new Error(res.error?.message || `Failed to fetch live risk assessment for ${loc.name}.`);
+    }
+
+    return {
+      ...res.data.risk,
+      locationId: loc.id,
+      locationName: loc.name,
+      isDemoData: false,
+    };
   }
 }
 

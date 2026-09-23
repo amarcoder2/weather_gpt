@@ -2,7 +2,8 @@ import React from 'react';
 import { Card } from '../ui/Card';
 import { RiskAssessment } from '../../types/risk';
 import { RISK_LEVEL_CONFIG } from '../../config/theme';
-import { AlertCircle, HelpCircle } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
+import { HelpCircle } from 'lucide-react';
 
 interface OverallRiskGaugeProps {
   assessment: RiskAssessment;
@@ -13,7 +14,18 @@ export const OverallRiskGauge: React.FC<OverallRiskGaugeProps> = ({
   assessment,
   onOpenExplanation,
 }) => {
+  const { t } = useLanguage();
   const config = RISK_LEVEL_CONFIG[assessment.overallLevel];
+
+  const getLevelLabel = (level: string) => {
+    switch (level.toLowerCase()) {
+      case 'low': return t('risk.levelLow');
+      case 'moderate': return t('risk.levelModerate');
+      case 'high': return t('risk.levelHigh');
+      case 'extreme': return t('risk.levelExtreme');
+      default: return level;
+    }
+  };
 
   // Calculate SVG circular arc values
   const radius = 70;
@@ -24,9 +36,9 @@ export const OverallRiskGauge: React.FC<OverallRiskGaugeProps> = ({
     <Card variant="glass" className="p-6 flex flex-col items-center text-center relative overflow-hidden">
       {/* Top Tag & Demo Badge */}
       <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
-        <span className="text-xs font-semibold text-slate-300">Composite Multi-Hazard Index</span>
+        <span className="text-xs font-semibold text-slate-300">{t('risk.compositeIndex')}</span>
         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
-          Simulated Risk Model
+          {t('risk.simulatedModel')}
         </span>
       </div>
 
@@ -65,13 +77,13 @@ export const OverallRiskGauge: React.FC<OverallRiskGaugeProps> = ({
           <span
             className={`mt-1 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${config.bg} ${config.border} ${config.textColor}`}
           >
-            {assessment.overallLevel}
+            {getLevelLabel(assessment.overallLevel)}
           </span>
         </div>
       </div>
 
       <p className="text-xs text-slate-300 max-w-sm mb-4">
-        {assessment.locationName}: {assessment.overallLevel} vulnerability based on synoptic rainfall intensity, convective storm energy, and river level telemetries.
+        {assessment.locationName}: {getLevelLabel(assessment.overallLevel)} {t('risk.vulnerabilitySummary')}
       </p>
 
       {/* Action Button: Why is this risk high? */}
@@ -80,7 +92,7 @@ export const OverallRiskGauge: React.FC<OverallRiskGaugeProps> = ({
         className="w-full py-2.5 px-4 rounded-xl bg-slate-800/90 hover:bg-sky-500/20 text-xs font-semibold text-slate-200 hover:text-sky-300 border border-slate-700 hover:border-sky-500/40 transition-all flex items-center justify-center gap-2"
       >
         <HelpCircle className="w-4 h-4 text-sky-400" />
-        <span>Why is this risk score high? (Diagnostic Breakdown)</span>
+        <span>{t('risk.whyHighRisk')}</span>
       </button>
     </Card>
   );

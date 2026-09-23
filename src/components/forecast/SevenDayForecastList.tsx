@@ -2,6 +2,7 @@ import React from 'react';
 import { DailyForecast } from '../../types/forecast';
 import { Card } from '../ui/Card';
 import { useWeather } from '../../context/WeatherContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { CloudRain, Sun, Cloud, CloudLightning, Wind, Droplets } from 'lucide-react';
 
 interface SevenDayForecastListProps {
@@ -10,6 +11,14 @@ interface SevenDayForecastListProps {
 
 export const SevenDayForecastList: React.FC<SevenDayForecastListProps> = ({ dailyData }) => {
   const { formatTemp } = useWeather();
+  const { t } = useLanguage();
+
+  const getTranslatedDay = (dayName: string) => {
+    if (dayName === 'Today') return t('forecast.today', 'Today');
+    if (dayName === 'Tomorrow') return t('forecast.tomorrow', 'Tomorrow');
+    const dayKey = `forecast.day.${dayName.toLowerCase()}`;
+    return t(dayKey, dayName);
+  };
 
   const getConditionMicroVisual = (code: string) => {
     switch (code) {
@@ -59,10 +68,10 @@ export const SevenDayForecastList: React.FC<SevenDayForecastListProps> = ({ dail
             {getConditionMicroVisual(day.conditionCode)}
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">{day.day}</span>
+                <span className="text-sm font-bold text-white">{getTranslatedDay(day.day)}</span>
                 <span className="text-xs text-slate-400 font-mono">({day.date})</span>
               </div>
-              <p className="text-xs text-sky-300 font-medium">{day.condition}</p>
+              <p className="text-xs text-sky-300 font-medium">{t('weather.condition.' + day.conditionCode, day.condition)}</p>
             </div>
           </div>
 
@@ -87,7 +96,7 @@ export const SevenDayForecastList: React.FC<SevenDayForecastListProps> = ({ dail
 
           {/* High / Low Temperature Range Bar */}
           <div className="flex items-center gap-3 min-w-[140px] justify-end">
-            <span className="text-xs font-mono font-medium text-sky-300">
+            <span className="text-xs font-mono font-medium text-sky-300" title={t('forecast.tempMin', 'Night Minimum')}>
               {formatTemp(day.tempMin)}
             </span>
             <div className="w-20 h-2 bg-slate-800 rounded-full overflow-hidden relative">
@@ -99,7 +108,7 @@ export const SevenDayForecastList: React.FC<SevenDayForecastListProps> = ({ dail
                 }}
               />
             </div>
-            <span className="text-xs font-mono font-bold text-amber-300">
+            <span className="text-xs font-mono font-bold text-amber-300" title={t('forecast.tempMax', 'Day Maximum')}>
               {formatTemp(day.tempMax)}
             </span>
           </div>

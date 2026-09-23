@@ -47,7 +47,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, requiredRole }) 
   }
 
   // Admin role check
-  if (requiredRole === 'admin' && role !== 'admin') {
+  const isAdmin = Boolean(role && (role.toLowerCase() === 'admin' || role.toLowerCase() === 'super_admin'));
+  if (requiredRole === 'admin' && !isAdmin) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
         <div className="max-w-md w-full p-8 rounded-3xl bg-navy-900 border border-red-500/30 text-center space-y-5 shadow-2xl">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { WeatherVisualState, QualityLevel } from '../../types/visualWeather';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Sun,
   Cloud,
@@ -11,7 +12,6 @@ import {
   Disc,
   Moon,
   Sparkles,
-  SlidersHorizontal,
 } from 'lucide-react';
 
 interface WeatherVisualControlsProps {
@@ -31,17 +31,19 @@ export const WeatherVisualControls: React.FC<WeatherVisualControlsProps> = ({
   quality,
   onQualityChange,
 }) => {
+  const { t } = useLanguage();
+
   const states: { id: WeatherVisualState; label: string; icon: React.ReactNode }[] = [
-    { id: 'clear', label: 'Clear Sky', icon: <Sun className="w-3.5 h-3.5 text-amber-400" /> },
-    { id: 'cloudy', label: 'Cloudy', icon: <Cloud className="w-3.5 h-3.5 text-slate-300" /> },
-    { id: 'rain', label: 'Rain', icon: <CloudRain className="w-3.5 h-3.5 text-sky-400" /> },
-    { id: 'heavy-rain', label: 'Heavy Rain', icon: <CloudRain className="w-3.5 h-3.5 text-blue-400" /> },
-    { id: 'thunderstorm', label: 'Thunderstorm', icon: <CloudLightning className="w-3.5 h-3.5 text-purple-400" /> },
-    { id: 'fog', label: 'Fog / Mist', icon: <Eye className="w-3.5 h-3.5 text-slate-400" /> },
-    { id: 'heat', label: 'Heatwave', icon: <Thermometer className="w-3.5 h-3.5 text-orange-400" /> },
-    { id: 'wind', label: 'Gale Wind', icon: <Wind className="w-3.5 h-3.5 text-indigo-400" /> },
-    { id: 'cyclone', label: 'Cyclone Eye', icon: <Disc className="w-3.5 h-3.5 text-purple-300" /> },
-    { id: 'night', label: 'Night Sky', icon: <Moon className="w-3.5 h-3.5 text-sky-300" /> },
+    { id: 'clear', label: t('visualControls.clearSky', 'Clear Sky'), icon: <Sun className="w-3.5 h-3.5 text-amber-400" /> },
+    { id: 'cloudy', label: t('visualControls.cloudy', 'Cloudy'), icon: <Cloud className="w-3.5 h-3.5 text-slate-300" /> },
+    { id: 'rain', label: t('visualControls.rain', 'Rain'), icon: <CloudRain className="w-3.5 h-3.5 text-sky-400" /> },
+    { id: 'heavy-rain', label: t('visualControls.heavyRain', 'Heavy Rain'), icon: <CloudRain className="w-3.5 h-3.5 text-blue-400" /> },
+    { id: 'thunderstorm', label: t('visualControls.thunderstorm', 'Thunderstorm'), icon: <CloudLightning className="w-3.5 h-3.5 text-purple-400" /> },
+    { id: 'fog', label: t('visualControls.fog', 'Fog / Mist'), icon: <Eye className="w-3.5 h-3.5 text-slate-400" /> },
+    { id: 'heat', label: t('visualControls.heatwave', 'Heatwave'), icon: <Thermometer className="w-3.5 h-3.5 text-orange-400" /> },
+    { id: 'wind', label: t('visualControls.galeWind', 'Gale Wind'), icon: <Wind className="w-3.5 h-3.5 text-indigo-400" /> },
+    { id: 'cyclone', label: t('visualControls.cycloneEye', 'Cyclone Eye'), icon: <Disc className="w-3.5 h-3.5 text-purple-300" /> },
+    { id: 'night', label: t('visualControls.nightSky', 'Night Sky'), icon: <Moon className="w-3.5 h-3.5 text-sky-300" /> },
   ];
 
   return (
@@ -58,14 +60,18 @@ export const WeatherVisualControls: React.FC<WeatherVisualControlsProps> = ({
           title="Sync 3D Atmosphere with active observatory weather"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Auto Telemetry: {isAutoMode ? 'ON' : 'OFF'}</span>
+          <span>
+            {isAutoMode
+              ? t('visualControls.autoOn', 'Auto Telemetry: ON')
+              : t('visualControls.autoOff', 'Auto Telemetry: OFF')}
+          </span>
         </button>
 
         <span className="text-slate-600 hidden sm:inline">|</span>
 
         {/* Quality Selector */}
         <div className="hidden sm:flex items-center gap-1 text-[11px] font-mono text-slate-400">
-          <span>Q:</span>
+          <span>{t('visualControls.quality', 'Quality:')}</span>
           {(['high', 'medium', 'low'] as QualityLevel[]).map((q) => (
             <button
               key={q}
@@ -80,7 +86,7 @@ export const WeatherVisualControls: React.FC<WeatherVisualControlsProps> = ({
         </div>
       </div>
 
-      {/* State Switcher Buttons (scrollable on small screens) */}
+      {/* State Switcher Buttons */}
       <div className="flex items-center gap-1 overflow-x-auto py-0.5 max-w-full">
         {states.map((st) => {
           const isActive = !isAutoMode && activeState === st.id;

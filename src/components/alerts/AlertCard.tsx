@@ -2,6 +2,7 @@ import React from 'react';
 import { WeatherAlert } from '../../types/alert';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   MapPin,
   Clock,
@@ -16,17 +17,39 @@ interface AlertCardProps {
 }
 
 export const AlertCard: React.FC<AlertCardProps> = ({ alert }) => {
+  const { t } = useLanguage();
+
+  const getSeverityLabel = (sev: string) => {
+    switch (sev.toLowerCase()) {
+      case 'critical': return t('alerts.critical');
+      case 'warning': return t('alerts.warning');
+      case 'watch': return t('alerts.watch');
+      case 'information': return t('alerts.info');
+      default: return sev;
+    }
+  };
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat.toLowerCase()) {
+      case 'cyclone': return t('alerts.cyclone');
+      case 'flood': return t('alerts.flood');
+      case 'heatwave': return t('alerts.heatwave');
+      case 'thunderstorm': return t('alerts.thunderstorm');
+      default: return cat;
+    }
+  };
+
   return (
     <Card variant="elevated" className="p-6 border-slate-800 hover:border-slate-700">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
           <Badge severity={alert.severity} dot>
-            {alert.severity} · {alert.category}
+            {getSeverityLabel(alert.severity)} · {getCategoryLabel(alert.category)}
           </Badge>
           {alert.bulletinNumber && (
             <span className="text-[11px] font-mono text-slate-400">
-              Bulletin #{alert.bulletinNumber}
+              {t('alerts.bulletin')} #{alert.bulletinNumber}
             </span>
           )}
         </div>
@@ -34,10 +57,10 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert }) => {
         <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
           <span className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5 text-sky-400" />
-            Issued: {alert.issuedTime}
+            {t('alerts.issued')}: {alert.issuedTime}
           </span>
           <span className="text-slate-500">|</span>
-          <span className="text-amber-400">Valid Until: {alert.validUntil}</span>
+          <span className="text-amber-400">{t('alerts.validUntil')}: {alert.validUntil}</span>
         </div>
       </div>
 
@@ -59,7 +82,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert }) => {
       {/* Affected Districts */}
       <div className="mt-4 pt-3 border-t border-slate-800/80">
         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-          High-Vulnerability Revenue Districts:
+          {t('alerts.vulnerableDistricts')}
         </span>
         <div className="flex flex-wrap gap-1.5">
           {alert.affectedDistricts.map((d, i) => (
@@ -77,7 +100,7 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert }) => {
       <div className="mt-5 p-4 rounded-xl bg-navy-950/60 border border-slate-800">
         <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
           <AlertOctagon className="w-4 h-4 text-amber-400" />
-          Mandatory Safety Directives:
+          {t('alerts.safetyDirectives')}
         </h4>
         <ul className="space-y-2">
           {alert.recommendedActions.map((act, i) => (
@@ -93,9 +116,9 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert }) => {
       <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500 font-mono">
         <span className="flex items-center gap-1">
           <Radio className="w-3 h-3 text-slate-400" />
-          Issuing Authority: {alert.source}
+          {t('alerts.issuingAuthority')}: {alert.source}
         </span>
-        <span>Standard Operating Procedure (SOP) Level III</span>
+        <span>{t('alerts.sopLevel')}</span>
       </div>
     </Card>
   );

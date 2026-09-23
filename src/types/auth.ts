@@ -1,9 +1,13 @@
 export type UserRole =
-  | 'admin'
   | 'user'
   | 'analyst'
-  | 'ADMIN'
+  | 'operator'
+  | 'admin'
+  | 'super_admin'
   | 'USER'
+  | 'ANALYST'
+  | 'OPERATOR'
+  | 'ADMIN'
   | 'SUPER_ADMIN'
   | 'MODERATOR';
 
@@ -13,6 +17,7 @@ export interface DbUser {
   email: string;
   password_hash: string;
   role: UserRole;
+  status?: string;
   latitude?: number | null;
   longitude?: number | null;
   location_name?: string | null;
@@ -28,6 +33,7 @@ export interface AuthUser {
   displayName: string;
   email: string;
   role: UserRole;
+  status?: string;
   latitude?: number | null;
   longitude?: number | null;
   location_name?: string | null;

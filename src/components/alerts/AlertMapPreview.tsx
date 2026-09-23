@@ -1,12 +1,14 @@
 import React from 'react';
 import { Card } from '../ui/Card';
 import { ShieldAlert, MapPin } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AlertMapPreviewProps {
   onSelectZone?: (location: string) => void;
 }
 
 export const AlertMapPreview: React.FC<AlertMapPreviewProps> = ({ onSelectZone }) => {
+  const { t } = useLanguage();
   const alertZones = [
     { name: 'Odisha & Bengal Coast', type: 'Cyclone / Gale Surge', severity: 'Critical', color: 'bg-red-500', top: '56%', left: '72%' },
     { name: 'Brahmaputra Valley (Assam)', type: 'River Flood', severity: 'Warning', color: 'bg-orange-500', top: '38%', left: '85%' },
@@ -21,14 +23,14 @@ export const AlertMapPreview: React.FC<AlertMapPreviewProps> = ({ onSelectZone }
         <div>
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-red-400" />
-            National Geospatial Hazard Overlay (India)
+            {t('alerts.mapTitle')}
           </h3>
           <p className="text-xs text-slate-400">
-            Multi-hazard telemetry mapped across active IMD meteorological sub-divisions
+            {t('alerts.mapSubtitle')}
           </p>
         </div>
         <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
-          GIS Active
+          {t('alerts.gisActive')}
         </span>
       </div>
 
@@ -61,7 +63,7 @@ export const AlertMapPreview: React.FC<AlertMapPreviewProps> = ({ onSelectZone }
               <p className="text-xs font-bold text-white">{zone.name}</p>
               <p className="text-[11px] text-sky-300 font-medium">{zone.type}</p>
               <span className="text-[10px] font-mono text-slate-400 mt-1 block">
-                Severity: {zone.severity}
+                {t('alerts.severityLabel')}: {zone.severity}
               </span>
             </div>
           </div>
@@ -73,20 +75,20 @@ export const AlertMapPreview: React.FC<AlertMapPreviewProps> = ({ onSelectZone }
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5 text-slate-300">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            Critical Zone
+            {t('alerts.criticalZone')}
           </span>
           <span className="flex items-center gap-1.5 text-slate-300">
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-            Warning Zone
+            {t('alerts.warningZone')}
           </span>
           <span className="flex items-center gap-1.5 text-slate-300">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-            Watch Zone
+            {t('alerts.watchZone')}
           </span>
         </div>
 
         <span className="text-[11px] font-mono text-slate-500">
-          Source: IMD Earth Observation GIS Grid
+          {t('alerts.gisSource')}
         </span>
       </div>
     </Card>

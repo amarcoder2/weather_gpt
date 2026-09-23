@@ -2,7 +2,8 @@ import React from 'react';
 import { DisasterEvent } from '../../types/disaster';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
-import { MapPin, Calendar, Users, ArrowRight } from 'lucide-react';
+import { MapPin, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface DisasterTimelineProps {
   events: DisasterEvent[];
@@ -10,6 +11,27 @@ interface DisasterTimelineProps {
 }
 
 export const DisasterTimeline: React.FC<DisasterTimelineProps> = ({ events, onSelectEvent }) => {
+  const { t } = useLanguage();
+
+  const getTypeLabel = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'cyclone':
+        return t('disasters.type.cyclone', 'Tropical Cyclones');
+      case 'flood':
+        return t('disasters.type.flood', 'Severe Floods');
+      case 'drought':
+        return t('disasters.type.drought', 'Droughts');
+      case 'heatwave':
+        return t('disasters.type.heatwave', 'Heatwave Spells');
+      case 'cloudburst':
+        return t('disasters.type.cloudburst', 'Cloudbursts');
+      case 'landslide':
+        return t('disasters.type.landslide', 'Landslides');
+      default:
+        return type;
+    }
+  };
+
   return (
     <div className="space-y-3">
       {events.map((ev) => (
@@ -23,7 +45,7 @@ export const DisasterTimeline: React.FC<DisasterTimelineProps> = ({ events, onSe
           <div className="flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-mono font-bold text-sky-400">{ev.year}</span>
-              <Badge variant="purple">{ev.type}</Badge>
+              <Badge variant="purple">{getTypeLabel(ev.type)}</Badge>
               <span className="text-xs text-slate-400 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-slate-400" />
                 {ev.state}
@@ -36,16 +58,19 @@ export const DisasterTimeline: React.FC<DisasterTimelineProps> = ({ events, onSe
 
           <div className="flex items-center gap-6 text-xs text-slate-300 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6 shrink-0">
             <div>
-              <span className="text-[11px] text-slate-500 block">Reported Toll</span>
-              <span className="font-bold text-red-300">{ev.casualties} lives</span>
+              <span className="text-[11px] text-slate-500 block">{t('disasters.timeline.casualties', 'Reported Toll')}</span>
+              <span className="font-bold text-red-300">{ev.casualties}</span>
             </div>
 
             <div>
-              <span className="text-[11px] text-slate-500 block">Est. Loss</span>
+              <span className="text-[11px] text-slate-500 block">{t('disasters.timeline.loss', 'Est. Loss')}</span>
               <span className="font-bold text-amber-300">{ev.economicImpact}</span>
             </div>
 
-            <button className="p-2 rounded-lg bg-navy-900 border border-slate-800 text-sky-400 hover:text-white hover:bg-sky-500/20 transition-colors">
+            <button
+              className="p-2 rounded-lg bg-navy-900 border border-slate-800 text-sky-400 hover:text-white hover:bg-sky-500/20 transition-colors"
+              aria-label={t('disasters.timeline.caseStudy', 'View Case Study')}
+            >
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

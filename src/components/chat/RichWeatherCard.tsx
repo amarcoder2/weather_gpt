@@ -3,18 +3,27 @@ import { WeatherData } from '../../types/weather';
 import { Card } from '../ui/Card';
 import { Droplets, Wind, Compass } from 'lucide-react';
 import { useWeather } from '../../context/WeatherContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const RichWeatherCard: React.FC<{ weather: WeatherData }> = ({ weather }) => {
   const { formatTemp } = useWeather();
+  const { t } = useLanguage();
 
   return (
     <Card variant="glass" className="p-4 my-2 border-sky-500/30 bg-navy-900/90 max-w-md">
       <div className="flex items-center justify-between">
         <div>
           <span className="text-xs font-semibold text-sky-400 uppercase tracking-wider">
-            Live Station Reading
+            {t('chat.liveStationReading')}
           </span>
-          <h4 className="text-base font-bold text-white">{weather.locationName}</h4>
+          <h4 className="text-base font-bold text-white leading-tight">{weather.locationName}</h4>
+          {weather.state && (
+            <p className="text-[11px] text-slate-400 font-medium">
+              {weather.district && weather.district.toLowerCase() !== weather.locationName.toLowerCase()
+                ? `${weather.district}, ${weather.state}`
+                : weather.state}
+            </p>
+          )}
         </div>
         <span className="text-3xl font-extrabold text-white tabular-numbers font-sans">
           {formatTemp(weather.temperature)}
@@ -26,7 +35,7 @@ export const RichWeatherCard: React.FC<{ weather: WeatherData }> = ({ weather })
       <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800 text-xs">
         <div className="flex items-center gap-1.5 text-slate-400">
           <Droplets className="w-3.5 h-3.5 text-sky-400" />
-          <span>{weather.humidity}% Hum</span>
+          <span>{weather.humidity}% {t('chat.hum')}</span>
         </div>
         <div className="flex items-center gap-1.5 text-slate-400">
           <Wind className="w-3.5 h-3.5 text-indigo-400" />

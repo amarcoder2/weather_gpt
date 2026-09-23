@@ -9,13 +9,12 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Bar,
-  ComposedChart,
 } from 'recharts';
 import { HourlyForecast } from '../../types/forecast';
 import { Card } from '../ui/Card';
 import { Tabs } from '../ui/Tabs';
 import { useWeather } from '../../context/WeatherContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface HourlyForecastChartProps {
   hourlyData: HourlyForecast[];
@@ -24,11 +23,12 @@ interface HourlyForecastChartProps {
 export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = ({ hourlyData }) => {
   const [activeMetric, setActiveMetric] = useState<'temp' | 'rain' | 'wind'>('temp');
   const { formatTemp } = useWeather();
+  const { t } = useLanguage();
 
   const metricsTabs = [
-    { id: 'temp', label: 'Temperature (°C)' },
-    { id: 'rain', label: 'Precipitation Prob (%)' },
-    { id: 'wind', label: 'Wind Velocity (km/h)' },
+    { id: 'temp', label: t('forecast.tabTemperature', 'Temperature (°C)') },
+    { id: 'rain', label: t('forecast.tabPrecipProb', 'Precipitation Prob (%)') },
+    { id: 'wind', label: t('forecast.tabWindSpeed', 'Wind Velocity (km/h)') },
   ];
 
   const getMetricConfig = () => {
@@ -39,7 +39,7 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = ({ hourly
           color: '#38BDF8',
           fillColor: 'rgba(56, 189, 248, 0.2)',
           unit: '%',
-          name: 'Rain Probability',
+          name: t('weather.precipProbability', 'Rain Probability'),
         };
       case 'wind':
         return {
@@ -47,7 +47,7 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = ({ hourly
           color: '#818CF8',
           fillColor: 'rgba(129, 140, 248, 0.2)',
           unit: ' km/h',
-          name: 'Wind Velocity',
+          name: t('weather.surfaceWind', 'Wind Velocity'),
         };
       default:
         return {
@@ -55,7 +55,7 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = ({ hourly
           color: '#F59E0B',
           fillColor: 'rgba(245, 158, 11, 0.2)',
           unit: '°C',
-          name: 'Temperature',
+          name: t('forecast.temperature', 'Temperature'),
         };
     }
   };
@@ -66,8 +66,8 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = ({ hourly
     <Card variant="glass" className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h3 className="text-base font-bold text-slate-100">24-Hour Synoptic Progression</h3>
-          <p className="text-xs text-slate-400">High-resolution hourly meteorological curve</p>
+          <h3 className="text-base font-bold text-slate-100">{t('forecast.hourlyHeading', '24-Hour Synoptic Progression')}</h3>
+          <p className="text-xs text-slate-400">{t('forecast.hourlySubtitle', 'High-resolution hourly meteorological curve')}</p>
         </div>
 
         <Tabs tabs={metricsTabs} activeTab={activeMetric} onChange={(id) => setActiveMetric(id as any)} />
@@ -98,20 +98,20 @@ export const HourlyForecastChart: React.FC<HourlyForecastChartProps> = ({ hourly
               tickFormatter={(v) => `${v}${config.unit}`}
             />
             <Tooltip
-              content={({ active, payload, label }) => {
+              content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload as HourlyForecast;
                   return (
                     <div className="p-3 bg-navy-900 border border-slate-700 rounded-xl shadow-xl text-xs space-y-1">
                       <p className="font-semibold text-slate-200">{data.fullTimestamp}</p>
-                      <p className="text-sky-300 font-medium">{data.condition}</p>
+                      <p className="text-sky-300 font-medium">{t('weather.condition.' + data.conditionCode, data.condition)}</p>
                       <div className="pt-1 text-slate-300 font-mono">
                         <span>{config.name}: </span>
                         <strong className="text-white">
                           {activeMetric === 'temp' ? formatTemp(data.temp) : `${data[config.dataKey as keyof HourlyForecast]}${config.unit}`}
                         </strong>
                       </div>
-                      <p className="text-[10px] text-slate-400">Humidity: {data.humidity}%</p>
+                      <p className="text-[10px] text-slate-400">{t('weather.relativeHumidity', 'Humidity')}: {data.humidity}%</p>
                     </div>
                   );
                 }

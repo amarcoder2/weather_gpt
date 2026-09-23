@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Mic, MicOff, Sparkles, Volume2, ArrowRight } from 'lucide-react';
+import { Mic, MicOff, Sparkles, ArrowRight, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useVoice } from '../../context/VoiceContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const VoiceModal: React.FC = () => {
   const {
@@ -14,19 +15,38 @@ export const VoiceModal: React.FC = () => {
     isListening,
     isProcessing,
     transcript,
+    interimTranscript,
+    error: voiceError,
+    activeLanguage,
     startListening,
     stopListening,
+    clearError,
   } = useVoice();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const handleSendToChat = () => {
     closeVoiceModal();
-    const cleanQuery = transcript.replace(/[“”"]/g, '');
-    router.push(`/chat?q=${encodeURIComponent(cleanQuery || 'Will it rain heavily in Kolkata this evening?')}`);
+    const cleanQuery = (transcript || interimTranscript).replace(/[“”"]/g, '').trim();
+    if (cleanQuery) {
+      router.push(`/chat?q=${encodeURIComponent(cleanQuery)}`);
+    }
   };
 
+  const handleStartAgain = () => {
+    clearError();
+    startListening();
+  };
+
+  const displayTranscript = transcript || interimTranscript;
+
   return (
-    <Modal isOpen={isModalOpen} onClose={closeVoiceModal} title="WeatherGPT Voice Assistant" maxWidth="md">
+    <Modal
+      isOpen={isModalOpen}
+      onClose={closeVoiceModal}
+      title={t('voice.title', 'WeatherGPT Voice Assistant')}
+      maxWidth="md"
+    >
       <div className="flex flex-col items-center text-center py-4 space-y-6">
         {/* Animated Microphone Orb */}
         <div className="relative">
@@ -69,47 +89,62 @@ export const VoiceModal: React.FC = () => {
         )}
 
         {/* Status text */}
-        <div className="space-y-2 max-w-sm">
-          <p className="text-xs font-mono font-medium text-sky-400 uppercase tracking-wider">
-            {isListening
-              ? '● Listening...'
-              : isProcessing
-              ? '◌ Converting speech to meteorological query...'
-              : 'Speech Captured'}
-          </p>
+        <div className="space-y-2 max-w-sm w-full">
+          <div className="flex items-center justify-center gap-2">
+            <p className="text-xs font-mono font-medium text-sky-400 uppercase tracking-wider">
+              {isListening
+                ? `● ${t('voice.listening', 'Listening...')}`
+                : isProcessing
+                ? `◌ ${t('voice.connecting', 'Converting speech to meteorological query...')}`
+                : displayTranscript
+                ? t('voice.captured', 'Speech Captured')
+                : t('voice.prompt', 'Press Speak to begin asking your question.')}
+            </p>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+              {activeLanguage}
+            </span>
+          </div>
+
           <div className="min-h-[50px] p-3 rounded-xl bg-navy-950/80 border border-slate-800 flex items-center justify-center">
             <p className="text-sm font-medium text-slate-200 italic">
-              {transcript || 'Press Speak to begin asking your question.'}
+              {displayTranscript || t('voice.prompt', 'Press Speak to begin asking your question.')}
             </p>
           </div>
+
+          {voiceError && (
+            <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-800/60 text-xs text-red-300 flex items-center gap-2 text-left">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <span>{voiceError}</span>
+            </div>
+          )}
         </div>
 
         {/* Controls */}
         <div className="flex items-center gap-3 pt-2">
           {isListening ? (
             <Button variant="danger" size="sm" onClick={stopListening} icon={<MicOff className="w-4 h-4" />}>
-              Stop Listening
+              {t('voice.stop', 'Stop Listening')}
             </Button>
           ) : (
-            <Button variant="secondary" size="sm" onClick={startListening} icon={<Mic className="w-4 h-4" />}>
-              Speak Again
+            <Button variant="secondary" size="sm" onClick={handleStartAgain} icon={<Mic className="w-4 h-4" />}>
+              {displayTranscript ? t('voice.speakAgain', 'Speak Again') : t('voice.prompt', 'Start Speaking')}
             </Button>
           )}
 
-          {isProcessing && (
+          {displayTranscript && !isListening && (
             <Button
               variant="primary"
               size="sm"
               onClick={handleSendToChat}
               icon={<ArrowRight className="w-4 h-4" />}
             >
-              Ask WeatherGPT
+              {t('voice.ask', 'Ask WeatherGPT')}
             </Button>
           )}
         </div>
 
         <p className="text-[11px] text-slate-400">
-          Phase 1 Prototype: Multilingual voice recognition simulation (Supports Hindi, Bengali, Odia & English).
+          Native Web Speech Recognition · Privacy preserved client-side
         </p>
       </div>
     </Modal>

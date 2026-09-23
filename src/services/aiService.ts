@@ -44,24 +44,53 @@ export const CHAT_SUGGESTIONS: ChatPromptSuggestion[] = [
   },
 ];
 
+import { LocationInfo } from '../types/location';
+import { resolveChatLocation, ChatLocationContext } from './chatLocationService';
+import { locationService } from './locationService';
+import { DEFAULT_LOCATIONS } from '../config/constants';
+
+export interface ChatContextOptions {
+  activeLocation?: LocationInfo;
+  activeLocationId?: string;
+  conversationLocation?: LocationInfo | null;
+  currentLocation?: LocationInfo | null;
+  language?: string;
+}
+
 export interface IAIService {
-  askWeatherGPT(query: string, locationId: string): Promise<ChatMessage>;
-  getInitialGreeting(locationId: string): Promise<ChatMessage>;
+  askWeatherGPT(query: string, locationOrContext?: string | ChatContextOptions, language?: string): Promise<ChatMessage>;
+  getInitialGreeting(locationOrId?: string | LocationInfo, language?: string): Promise<ChatMessage>;
 }
 
 class MockAIService implements IAIService {
-  async getInitialGreeting(locationId: string): Promise<ChatMessage> {
-    const weather = await weatherService.getCurrentWeather(locationId);
+  async getInitialGreeting(locationOrId?: string | LocationInfo, _language?: string): Promise<ChatMessage> {
+    let loc: LocationInfo | undefined;
+    if (typeof locationOrId === 'object' && locationOrId !== null) {
+      loc = locationOrId;
+    } else if (typeof locationOrId === 'string' && locationOrId.trim()) {
+      const norm = locationOrId.toLowerCase().trim();
+      loc = await locationService.getLocationById(norm);
+      if (!loc) {
+        loc = DEFAULT_LOCATIONS.find((l) => l.id.toLowerCase() === norm);
+      }
+    }
+    if (!loc) {
+      loc = DEFAULT_LOCATIONS[0];
+    }
+
+    const weather = await weatherService.getCurrentWeather(loc);
     return {
       id: 'msg-init-0',
       sender: 'assistant',
-      text: `Namaste! I am **WeatherGPT**, your meteorological intelligence and disaster-readiness assistant, powered by Ministry of Earth Sciences (MoES) and India Meteorological Department (IMD) frameworks.\n\nCurrently monitoring **${weather.locationName}** (${weather.temperature}°C, ${weather.condition}). How can I assist you with forecasts, risk analysis, or emergency advisories today?`,
+      text: `Namaste! I am **WeatherGPT**, your meteorological intelligence and disaster-readiness assistant, powered by Ministry of Earth Sciences (MoES) and India Meteorological Department (IMD) frameworks with live numerical weather prediction.\n\nCurrently monitoring **${weather.locationName}** (${weather.temperature}°C, ${weather.condition}). How can I assist you with forecasts, risk analysis, or emergency advisories today?`,
       timestamp: 'Just now',
       cardType: 'weather',
       cardData: {
         weather,
       },
-      sources: ['IMD Surface Meteorological Network', 'INSAT-3DR Rapid Scanning Satellite', 'Doppler Radar Network'],
+      resolvedLocation: loc,
+      locationSource: 'selected_location',
+      sources: ['Open-Meteo Surface NWP Telemetry', 'INSAT-3DR Satellite Analysis Models', 'Regional Weather Mesh'],
       suggestedFollowups: [
         'Will it rain tomorrow?',
         'What is our flood risk score?',
@@ -70,18 +99,64 @@ class MockAIService implements IAIService {
     };
   }
 
-  async askWeatherGPT(query: string, locationId: string): Promise<ChatMessage> {
+  async askWeatherGPT(
+    query: string,
+    locationOrContext?: string | ChatContextOptions,
+    language?: string
+  ): Promise<ChatMessage> {
+    let context: ChatLocationContext = {};
+    let lang = language;
+
+    if (typeof locationOrContext === 'object' && locationOrContext !== null) {
+      context = {
+        conversationLocation: locationOrContext.conversationLocation,
+        selectedLocation: locationOrContext.activeLocation,
+        currentLocation: locationOrContext.currentLocation,
+      };
+      lang = locationOrContext.language || language;
+    } else if (typeof locationOrContext === 'string' && locationOrContext.trim()) {
+      const normId = locationOrContext.trim().toLowerCase();
+      const def = DEFAULT_LOCATIONS.find((l) => l.id.toLowerCase() === normId);
+      if (def) {
+        context.selectedLocation = def;
+      }
+    }
+
+    // Phase 5: Resolve chat location using nationwide directory and strict priority chain
+    const resolution = await resolveChatLocation(query, context);
+
+    // Phase 10: DO NOT silently fall back to Kolkata when explicit location cannot be found
+    if (resolution.status === 'NOT_FOUND') {
+      const notFoundName = resolution.notFoundTerm || 'that location';
+      return {
+        id: `msg-${Date.now()}`,
+        sender: 'assistant',
+        text: `I couldn't find **"${notFoundName}"** in the Indian location database.\n\nPlease verify the spelling, or specify the city and state (e.g. *"Bhubaneswar, Odisha"* or *"Mumbai, Maharashtra"*).`,
+        timestamp: 'Just now',
+        sources: ['WeatherGPT Indian Location Directory (GeoNames India CC BY 4.0)'],
+        suggestedFollowups: [
+          'What is the weather of Bhubaneswar now?',
+          'What is the weather in Mumbai?',
+          'What is the weather in Delhi?',
+        ],
+      };
+    }
+
+    const targetLocation = resolution.location || DEFAULT_LOCATIONS[0];
+
     try {
       const res = await apiClient.post<{
         userMessage: { id: string; content: string; timestamp: string };
         assistantMessage: { id: string; content: string; timestamp: string; suggestedPrompts?: string[]; modelUsed?: string };
       }>('/chat', {
         message: query,
-        locationId,
+        locationId: targetLocation.id,
+        coordinates: { latitude: targetLocation.lat, longitude: targetLocation.lon },
+        language: lang,
       });
 
       if (res.success && res.data?.assistantMessage?.content) {
-        const weather = await weatherService.getCurrentWeather(locationId);
+        const weather = await weatherService.getCurrentWeather(targetLocation);
         return {
           id: res.data.assistantMessage.id || `msg-${Date.now()}`,
           sender: 'assistant',
@@ -89,10 +164,12 @@ class MockAIService implements IAIService {
           timestamp: 'Just now',
           cardType: 'weather',
           cardData: { weather },
+          resolvedLocation: targetLocation,
+          locationSource: resolution.source,
           sources: [
-            res.data.assistantMessage.modelUsed || 'WeatherGPT Gemini/Reasoning Core',
-            'IMD Real-Time AWS Telemetry',
-            'INSAT-3DR Rapid Meteorological Feed',
+            res.data.assistantMessage.modelUsed || 'WeatherGPT Meteorological Reasoning Core',
+            'Open-Meteo Real-Time NWP Telemetry',
+            'INSAT-3DR Satellite Meteorological Feed',
           ],
           suggestedFollowups:
             res.data.assistantMessage.suggestedPrompts && res.data.assistantMessage.suggestedPrompts.length > 0
@@ -105,17 +182,25 @@ class MockAIService implements IAIService {
         };
       }
     } catch {
-      // Fallback to local response below
+      // Fallback to local meteorological reasoning below
     }
 
-    // Simulate natural LLM processing latency for fallback
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // Simulate natural LLM processing latency for local reasoning core
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const q = query.toLowerCase();
-    const weather = await weatherService.getCurrentWeather(locationId);
-    const forecast = await forecastService.getForecast(locationId);
-    const risk = await riskService.getRiskAssessment(locationId);
+    const weather = await weatherService.getCurrentWeather(targetLocation);
+    const forecast = await forecastService.getForecast(targetLocation);
+    const risk = await riskService.getRiskAssessment(targetLocation);
     const alerts = await disasterService.getActiveAlerts();
+
+    // Phase 9: Consistency Verification
+    if (
+      weather.locationName.trim().toLowerCase() !== targetLocation.name.trim().toLowerCase() &&
+      (Math.abs(weather.lat - targetLocation.lat) > 0.5 || Math.abs(weather.lon - targetLocation.lon) > 0.5)
+    ) {
+      throw new Error(`Location consistency mismatch: requested "${targetLocation.name}" but received telemetry for "${weather.locationName}".`);
+    }
 
     // Intent 1: Rain or Tomorrow's weather
     if (q.includes('rain') || q.includes('tomorrow') || q.includes('shower') || q.includes('umbrella')) {
@@ -129,6 +214,8 @@ class MockAIService implements IAIService {
         cardData: {
           forecast: forecast.daily.slice(0, 3),
         },
+        resolvedLocation: targetLocation,
+        locationSource: resolution.source,
         sources: ['IMD Multi-Model Ensemble (MME)', 'WRF 3km Mesoscale Model', 'Global Forecast System (GFS)'],
         suggestedFollowups: [
           'What hours will rain be heaviest?',
@@ -158,6 +245,8 @@ class MockAIService implements IAIService {
             safeWindow: 'Conditions expected to improve post 22:00 IST as tidal crest subsides.',
           },
         },
+        resolvedLocation: targetLocation,
+        locationSource: resolution.source,
         sources: ['Central Water Commission (CWC) River Gauges', 'State Disaster Management Authority (SDMA)'],
         suggestedFollowups: [
           'Show detailed risk factor breakdown',
@@ -186,6 +275,8 @@ class MockAIService implements IAIService {
             safeWindow: 'Fieldwork window opens Wednesday morning under clearer skies.',
           },
         },
+        resolvedLocation: targetLocation,
+        locationSource: resolution.source,
         sources: ['IMD Agromet Advisory Service', 'ICAR Agricultural Research Extension'],
         suggestedFollowups: [
           'What is the 7-day soil moisture forecast?',
@@ -206,6 +297,8 @@ class MockAIService implements IAIService {
         cardData: {
           alert: topAlert,
         },
+        resolvedLocation: targetLocation,
+        locationSource: resolution.source,
         sources: ['IMD Cyclone Warning Division', 'National Disaster Management Authority (NDMA)'],
         suggestedFollowups: [
           'Show recommended civilian actions',
@@ -220,13 +313,15 @@ class MockAIService implements IAIService {
       return {
         id: `msg-${Date.now()}`,
         sender: 'assistant',
-        text: `Here is today's weather in plain and simple terms:\n\n- **How it feels:** It feels very muggy and sticky outside (**${weather.feelsLike}°C**), even though the actual thermometer says **${weather.temperature}°C**.\n- **The sky:** Heavy monsoon clouds are rolling in from the coast.\n- **The big message:** Expect sudden showers with rumbling thunder later in the day. Keep an umbrella in your bag and stay indoors if thunder starts roaring!\n- **Air Quality:** The air is breathable and clean (**AQI ${weather.airQualityIndex}**).`,
+        text: `Here is today's weather in plain and simple terms for **${weather.locationName}**:\n\n- **How it feels:** It feels very muggy and sticky outside (**${weather.feelsLike}°C**), even though the actual thermometer says **${weather.temperature}°C**.\n- **The sky:** Heavy clouds are observed over ${weather.district}.\n- **The big message:** Expect sudden showers with rumbling thunder later in the day. Keep an umbrella in your bag and stay indoors if thunder starts roaring!\n- **Air Quality:** The air quality index is registered at **AQI ${weather.airQualityIndex}**.`,
         timestamp: 'Just now',
         cardType: 'weather',
         cardData: {
           weather,
         },
-        sources: ['IMD Alipore Observatory Live Telemetry'],
+        resolvedLocation: targetLocation,
+        locationSource: resolution.source,
+        sources: [weather.stationName || `${weather.locationName} Surface Telemetry`, 'Open-Meteo Real-Time NWP Telemetry'],
         suggestedFollowups: [
           'Will it stay this hot tonight?',
           'What causes sticky humidity?',
@@ -234,7 +329,7 @@ class MockAIService implements IAIService {
       };
     }
 
-    // Default conversational response
+    // Default conversational response (Intent 6)
     return {
       id: `msg-${Date.now()}`,
       sender: 'assistant',
@@ -244,7 +339,9 @@ class MockAIService implements IAIService {
       cardData: {
         weather,
       },
-      sources: ['IMD National Weather Forecasting Centre (NWFC)', 'INSAT-3DR Geostationary Imager', 'WeatherGPT Neural Met Engine'],
+      resolvedLocation: targetLocation,
+      locationSource: resolution.source,
+      sources: ['Open-Meteo Numerical Met Prediction', 'Satellite Observational Analysis', 'WeatherGPT Meteorological Reasoning Engine'],
       suggestedFollowups: [
         'Will it rain tomorrow?',
         'Is there a flood risk in my area?',

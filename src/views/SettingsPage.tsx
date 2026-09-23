@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Settings, Globe2, Bell, Sliders, Eye, Mic, Check } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { language, setLanguage, languages } = useLanguage();
+  const { language, setLanguage, languages, t } = useLanguage();
   const { tempUnit, setTempUnit } = useWeather();
 
   const [notifications, setNotifications] = useState({
@@ -41,16 +41,16 @@ export const SettingsPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-sky-400" />
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              Platform Preferences & Governance
+              {t('settings.title', 'Platform Preferences & Governance')}
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Configure telemetry units, multilingual translation defaults, and emergency broadcast dispatch channels
+            {t('settings.subtitle', 'Configure telemetry units, multilingual translation defaults, and emergency broadcast dispatch channels')}
           </p>
         </div>
 
         <Button variant="primary" size="sm" onClick={handleSave}>
-          {savedSuccess ? 'Settings Saved ✓' : 'Save Preferences'}
+          {savedSuccess ? t('settings.savedSuccess', 'Settings Saved ✓') : t('settings.savePreferences', 'Save Preferences')}
         </Button>
       </div>
 
@@ -58,10 +58,10 @@ export const SettingsPage: React.FC = () => {
       <Card variant="glass" className="p-6 space-y-4">
         <div className="flex items-center gap-2 text-sky-400 font-semibold text-sm">
           <Globe2 className="w-4 h-4" />
-          <span>Multilingual Natural Language Interface (11 Regional Indian Languages)</span>
+          <span>{t('settings.languageTitle', 'Multilingual Natural Language Interface (11 Regional Indian Languages)')}</span>
         </div>
         <p className="text-xs text-slate-400">
-          Select primary regional language for conversational AI synthesis and emergency broadcast notifications.
+          {t('settings.languageDesc', 'Select primary regional language for conversational AI synthesis and emergency broadcast notifications.')}
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-2">
@@ -92,13 +92,13 @@ export const SettingsPage: React.FC = () => {
       <Card variant="glass" className="p-6 space-y-4">
         <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
           <Sliders className="w-4 h-4" />
-          <span>Measurement Units & Engineering Baselines</span>
+          <span>{t('settings.unitsTitle', 'Measurement Units & Engineering Baselines')}</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-medium text-slate-300 block mb-2">
-              Temperature Unit
+              {t('settings.tempUnit', 'Temperature Unit')}
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -109,7 +109,7 @@ export const SettingsPage: React.FC = () => {
                     : 'bg-navy-950 border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
-                Celsius (°C) — IMD Standard
+                {t('settings.celsius', 'Celsius (°C) — IMD Standard')}
               </button>
               <button
                 onClick={() => setTempUnit('F')}
@@ -119,17 +119,17 @@ export const SettingsPage: React.FC = () => {
                     : 'bg-navy-950 border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
-                Fahrenheit (°F)
+                {t('settings.fahrenheit', 'Fahrenheit (°F)')}
               </button>
             </div>
           </div>
 
           <div>
             <label className="text-xs font-medium text-slate-300 block mb-2">
-              Wind Velocity & Precipitation
+              {t('settings.windPrecipTitle', 'Wind Velocity & Precipitation')}
             </label>
             <p className="text-xs text-slate-400 mt-2">
-              Wind: <strong className="text-slate-200">Kilometers per hour (km/h)</strong> | Rain: <strong className="text-slate-200">Millimeters (mm)</strong>
+              {t('settings.windPrecipDesc', 'Wind: Kilometers per hour (km/h) | Rain: Millimeters (mm)')}
             </p>
           </div>
         </div>
@@ -139,10 +139,10 @@ export const SettingsPage: React.FC = () => {
       <Card variant="glass" className="p-6 space-y-4">
         <div className="flex items-center gap-2 text-red-400 font-semibold text-sm">
           <Bell className="w-4 h-4" />
-          <span>Disaster Early Warning Push Notifications (Simulated)</span>
+          <span>{t('settings.notificationsTitle', 'Emergency Broadcast Channels')}</span>
         </div>
         <p className="text-xs text-slate-400">
-          Subscribe to immediate high-priority emergency sirens and advisory bulletins.
+          {t('settings.notificationsDesc', 'Subscribe to immediate high-priority emergency sirens and advisory bulletins.')}
         </p>
 
         <div className="space-y-2.5 pt-2">
@@ -180,7 +180,7 @@ export const SettingsPage: React.FC = () => {
       <Card variant="glass" className="p-6 space-y-4">
         <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
           <Eye className="w-4 h-4" />
-          <span>Accessibility & Universal Design</span>
+          <span>{t('settings.accessibilityTitle', 'Accessibility & Universal Design')}</span>
         </div>
 
         <div className="space-y-2.5">
@@ -194,9 +194,9 @@ export const SettingsPage: React.FC = () => {
               className="mt-0.5 rounded border-slate-700 bg-navy-900 text-sky-500"
             />
             <div className="text-xs">
-              <span className="font-semibold text-slate-200 block">Prefers Reduced Motion</span>
+              <span className="font-semibold text-slate-200 block">{t('settings.reducedMotionTitle', 'Prefers Reduced Motion')}</span>
               <span className="text-slate-400">
-                Disables continuous 3D Earth rotations and transitions for vestibular safety.
+                {t('settings.reducedMotionDesc', 'Disables continuous 3D Earth rotations and transitions for vestibular safety.')}
               </span>
             </div>
           </label>

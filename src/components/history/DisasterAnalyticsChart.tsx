@@ -3,8 +3,11 @@
 import React from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { Card } from '../ui/Card';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const DisasterAnalyticsChart: React.FC = () => {
+  const { t } = useLanguage();
+
   // Aggregate stats of historical disaster events in India
   const data = [
     { year: '1995-1999', cyclones: 6, floods: 12, heatwaves: 4 },
@@ -19,11 +22,15 @@ export const DisasterAnalyticsChart: React.FC = () => {
     <Card variant="glass" className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <div>
-          <h3 className="text-base font-bold text-white">Historical Extreme Event Escalation (5-Year Intervals)</h3>
-          <p className="text-xs text-slate-400">Comparing cyclone, riverine flood, and heatwave incidences in India</p>
+          <h3 className="text-base font-bold text-white">
+            {t('disasters.analytics.chartTitle', 'Historical Extreme Event Escalation (5-Year Intervals)')}
+          </h3>
+          <p className="text-xs text-slate-400">
+            {t('disasters.analytics.chartSubtitle', 'Comparing cyclone, riverine flood, and heatwave incidences in India')}
+          </p>
         </div>
         <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-          Source: NDMA & IMD Archive
+          {t('disasters.analytics.source', 'Source: NDMA & IMD Archive')}
         </span>
       </div>
 
@@ -37,9 +44,9 @@ export const DisasterAnalyticsChart: React.FC = () => {
               contentStyle={{ backgroundColor: '#0B132B', borderColor: '#334155', borderRadius: '0.75rem', fontSize: '12px' }}
             />
             <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-            <Bar dataKey="cyclones" name="Tropical Cyclones" fill="#A855F7" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="floods" name="Severe Floods" fill="#38BDF8" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="heatwaves" name="Heatwave Spells" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="cyclones" name={t('disasters.type.cyclone', 'Tropical Cyclones')} fill="#A855F7" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="floods" name={t('disasters.type.flood', 'Severe Floods')} fill="#38BDF8" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="heatwaves" name={t('disasters.type.heatwave', 'Heatwave Spells')} fill="#F59E0B" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -9,12 +9,42 @@ export interface TokenPayload {
   name: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET_KEY || 'weathergpt-sih-2026-secret-key-moes-imd-secure';
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET_KEY;
+  if (!secret || secret.trim().length === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY must be set in production environment.');
+    }
+    return 'weathergpt-dev-only-secret-do-not-use-in-production-moes-imd';
+  }
+  return secret.trim();
+}
+
 const JWT_ALGORITHM = (process.env.JWT_ALGORITHM as jwt.Algorithm) || 'HS256';
 const EXPIRES_IN_MINUTES = parseInt(process.env.ACCESS_TOKEN_EXPIRE_MINUTES || '1440', 10); // default 24h
 
+/**
+ * Uniform server-side check for administrative authorization.
+ * Supports both 'admin' and 'super_admin' roles consistently.
+ */
+export function isAdminRole(role?: string | null): boolean {
+  if (!role) return false;
+  const normalized = role.toLowerCase().trim();
+  return normalized === 'admin' || normalized === 'super_admin';
+}
+
+/**
+  * Server-side check for super-administrator authorization.
+  * Super admins have full privileges including privilege escalation and root administration.
+  */
+export function isSuperAdminRole(role?: string | null): boolean {
+  if (!role) return false;
+  return role.toLowerCase().trim() === 'super_admin';
+}
+
 export function signToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  const secret = getJwtSecret();
+  return jwt.sign(payload, secret, {
     algorithm: JWT_ALGORITHM,
     expiresIn: `${EXPIRES_IN_MINUTES}m`,
   });
@@ -22,7 +52,8 @@ export function signToken(payload: TokenPayload): string {
 
 export function verifyToken(token: string): TokenPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const secret = getJwtSecret();
+    const decoded = jwt.verify(token, secret, {
       algorithms: [JWT_ALGORITHM],
     }) as TokenPayload;
     return decoded;
@@ -37,7 +68,7 @@ export function getBearerToken(req: NextRequest): string | null {
     return authHeader.substring(7).trim();
   }
 
-  // Also check cookie
+  // Also check HttpOnly cookie
   const cookie = req.cookies.get('weathergpt_token');
   if (cookie && cookie.value) {
     return cookie.value;
@@ -50,22 +81,4 @@ export function authenticateRequest(req: NextRequest): TokenPayload | null {
   const token = getBearerToken(req);
   if (!token) return null;
   return verifyToken(token);
-}
-
-export function signVault(data: unknown): string {
-  return jwt.sign({ vault: data }, JWT_SECRET, {
-    algorithm: JWT_ALGORITHM,
-    expiresIn: '30d',
-  });
-}
-
-export function verifyVault<T>(token: string): T | null {
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
-      algorithms: [JWT_ALGORITHM],
-    }) as { vault: T };
-    return decoded?.vault || null;
-  } catch {
-    return null;
-  }
 }

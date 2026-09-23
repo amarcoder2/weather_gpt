@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/auth/jwt';
+import { authenticateRequest, isAdminRole } from '@/lib/auth/jwt';
 
 export async function GET(req: NextRequest) {
+  // LAYER 3: Endpoint-level Server Authorization
   const user = authenticateRequest(req);
   if (!user) {
     return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required. Missing Bearer token.' } },
+      { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required. Missing or invalid session token.' } },
       { status: 401 }
     );
   }
 
-  if (user.role !== 'admin') {
+  if (!isAdminRole(user.role)) {
     return NextResponse.json(
       {
         success: false,
         error: {
           code: 'FORBIDDEN',
-          message: `Forbidden: User role '${user.role}' is not authorized to access administrative operations.`,
+          message: 'Forbidden: Administrative authorization required.',
         },
       },
       { status: 403 }

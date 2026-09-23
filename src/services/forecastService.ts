@@ -1,32 +1,49 @@
 import { ForecastData } from '../types/forecast';
-import { MOCK_FORECASTS } from '../data/mockForecast';
+import { LocationInfo } from '../types/location';
+import { DEFAULT_LOCATIONS } from '../config/constants';
 import { apiClient } from './apiClient';
+import { locationService } from './locationService';
 
 export interface IForecastService {
-  getForecast(locationId: string): Promise<ForecastData>;
+  getForecast(locationOrId: string | LocationInfo): Promise<ForecastData>;
 }
 
 class ForecastService implements IForecastService {
-  async getForecast(locationId: string): Promise<ForecastData> {
-    const normalized = locationId.toLowerCase();
-    try {
-      const res = await apiClient.get<Record<string, unknown>>(`/weather/forecast?locationId=${encodeURIComponent(normalized)}`);
-      if (res.success && res.data) {
-        const d = res.data;
-        const fallback = MOCK_FORECASTS[normalized] || MOCK_FORECASTS['kolkata'];
-        return {
-          locationId: normalized,
-          hourly: Array.isArray(d.hourly) ? d.hourly : fallback.hourly,
-          daily: Array.isArray(d.daily) ? d.daily : fallback.daily,
-          synopticOverview: (d.synopticOverview as string) || (d.summaryText as string) || fallback.synopticOverview,
-        };
+  async getForecast(locationOrId: string | LocationInfo): Promise<ForecastData> {
+    let loc: LocationInfo | undefined;
+
+    if (typeof locationOrId === 'object' && locationOrId !== null) {
+      loc = locationOrId;
+    } else {
+      const normalized = locationOrId.toLowerCase().trim();
+      loc = await locationService.getLocationById(normalized);
+      if (!loc) {
+        loc = DEFAULT_LOCATIONS.find((l) => l.id.toLowerCase() === normalized);
       }
-    } catch {
-      // Fallback
     }
 
-    const data = MOCK_FORECASTS[normalized] || MOCK_FORECASTS['kolkata'];
-    return { ...data };
+    if (!loc) {
+      throw new Error(`Location "${typeof locationOrId === 'string' ? locationOrId : 'unknown'}" could not be resolved. Please search and select a valid location.`);
+    }
+
+    const params = new URLSearchParams({
+      latitude: loc.lat.toString(),
+      longitude: loc.lon.toString(),
+      city: loc.name,
+      district: loc.district,
+      state: loc.state,
+    });
+
+    const res = await apiClient.get<{ forecast: ForecastData }>(`/weather/coordinates?${params.toString()}`);
+
+    if (!res.success || !res.data?.forecast) {
+      throw new Error(res.error?.message || `Failed to fetch live forecast for ${loc.name}.`);
+    }
+
+    return {
+      ...res.data.forecast,
+      locationId: loc.id,
+    };
   }
 }
 

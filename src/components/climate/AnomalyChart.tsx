@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { ClimateYearData } from '../../types/climate';
 import { Card } from '../ui/Card';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AnomalyChartProps {
   records: ClimateYearData[];
@@ -21,19 +22,21 @@ interface AnomalyChartProps {
 }
 
 export const AnomalyChart: React.FC<AnomalyChartProps> = ({ records, period }) => {
+  const { t } = useLanguage();
+
   return (
     <Card variant="glass" className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <div>
           <h3 className="text-base font-bold text-white">
-            Long-Term Thermal & Hydrological Anomalies ({period})
+            {t('climate.chart.title', 'Long-Term Thermal & Hydrological Anomalies')} ({period})
           </h3>
           <p className="text-xs text-slate-400">
-            Temperature departure (°C) and extreme weather incidence index
+            {t('climate.chart.subtitle', 'Temperature departure (°C) and extreme weather incidence index')}
           </p>
         </div>
         <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30">
-          Climatological Normal Baseline
+          {t('climate.chart.baseline', 'Climatological Normal Baseline')}
         </span>
       </div>
 
@@ -67,7 +70,7 @@ export const AnomalyChart: React.FC<AnomalyChartProps> = ({ records, period }) =
             <Bar
               yAxisId="events"
               dataKey="extremeEventsCount"
-              name="Extreme Weather Episodes"
+              name={t('climate.chart.extremeEvents', 'Extreme Weather Episodes')}
               fill="rgba(56, 189, 248, 0.4)"
               radius={[4, 4, 0, 0]}
             />
@@ -75,7 +78,7 @@ export const AnomalyChart: React.FC<AnomalyChartProps> = ({ records, period }) =
               yAxisId="temp"
               type="monotone"
               dataKey="tempAnomaly"
-              name="Temperature Anomaly (°C)"
+              name={t('climate.chart.tempAnomaly', 'Temperature Anomaly (°C)')}
               stroke="#F59E0B"
               strokeWidth={3}
               dot={{ r: 4, fill: '#F59E0B' }}

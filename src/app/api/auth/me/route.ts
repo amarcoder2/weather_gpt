@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, verifyVault } from '../../../../lib/auth/jwt';
+import { authenticateRequest } from '../../../../lib/auth/jwt';
 import { userRepository } from '../../../../lib/db/postgres';
-import { DbUser } from '../../../../types/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,13 +12,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let user = await userRepository.findById(payload.userId);
-    if (!user) {
-      const vaultCookie = req.cookies.get('weathergpt_user_vault')?.value;
-      const vaultUser = vaultCookie ? verifyVault<DbUser>(vaultCookie) : null;
-      if (vaultUser && (vaultUser.id === payload.userId || vaultUser.email === payload.email)) {
-        user = vaultUser;
-      }
+    let user = null;
+    try {
+      user = await userRepository.findById(payload.userId);
+    } catch {
+      // In case database connection fails or root admin user is active
+      user = null;
     }
 
     const safeUser = {
@@ -41,10 +39,9 @@ export async function GET(req: NextRequest) {
       user: safeUser,
     });
   } catch (err: unknown) {
-    console.error('Auth /me API error:', err);
-    const message = err instanceof Error ? err.message : 'Internal server error while fetching session profile.';
+    console.error('Auth /me API error:', err instanceof Error ? err.message : 'Unknown');
     return NextResponse.json(
-      { error: message },
+      { error: 'An unexpected error occurred while processing your request. Please try again.' },
       { status: 500 }
     );
   }

@@ -33,11 +33,11 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
   const { t } = useLanguage();
-  const { role, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
 
   const authenticatedNavItems = [
-    { to: '/', label: 'Home', icon: Home, exact: true },
+    { to: '/', label: t('nav.home', 'Home'), icon: Home, exact: true },
     { to: '/dashboard', label: t('nav.dashboard', 'Dashboard'), icon: LayoutDashboard },
     { to: '/forecast', label: t('nav.forecast', 'Forecast'), icon: CloudSun },
     { to: '/chat', label: t('nav.chat', 'Ask WeatherGPT'), icon: Bot, badge: 'AI' },
@@ -47,16 +47,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
     { to: '/history', label: t('nav.history', 'Disaster History'), icon: History },
     { to: '/climate', label: t('nav.climate', 'Climate Trends'), icon: TrendingUp },
     { to: '/locations', label: t('nav.locations', 'Locations'), icon: MapPin },
-    { to: '/admin', label: 'Admin Console', icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+    { to: '/admin', label: t('nav.admin', 'Admin Console'), icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
     { to: '/settings', label: t('nav.settings', 'Settings'), icon: Settings },
     { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
   ];
 
   const unauthenticatedNavItems = [
-    { to: '/', label: 'Home', icon: Home, exact: true },
-    { to: '/login', label: 'Sign In', icon: LogIn },
-    { to: '/register', label: 'Create Account', icon: UserPlus },
-    { to: '/admin', label: 'Admin Console', icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+    { to: '/', label: t('nav.home', 'Home'), icon: Home, exact: true },
+    { to: '/login', label: t('common.signIn', 'Sign In'), icon: LogIn },
+    { to: '/register', label: t('common.createAccount', 'Create Account'), icon: UserPlus },
+    { to: '/admin', label: t('nav.admin', 'Admin Console'), icon: ShieldAlert, badge: 'OPS', badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
     { to: '/about', label: t('nav.about', 'About / MoES'), icon: Info },
   ];
 
@@ -108,10 +108,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
           <button
             onClick={logout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors group mt-4 border border-transparent hover:border-red-500/30"
-            title={collapsed ? 'Sign Out' : undefined}
+            title={collapsed ? t('common.signOut', 'Sign Out') : undefined}
           >
             <LogOut className="w-4.5 h-4.5 shrink-0 text-red-400 group-hover:scale-105 transition-transform" />
-            {!collapsed && <span>Sign Out</span>}
+            {!collapsed && <span>{t('common.signOut', 'Sign Out')}</span>}
           </button>
         )}
       </div>
@@ -126,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors ml-auto"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? t('nav.expandSidebar', 'Expand sidebar') : t('nav.collapseSidebar', 'Collapse sidebar')}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
